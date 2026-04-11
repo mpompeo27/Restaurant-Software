@@ -84,7 +84,7 @@ def validate_params(**params):
     elif name == 'party_size':
       # Confirm party_size is an integer.
       if not isinstance(value, int):
-        raise TypeError(f"Invalid party size '\{value}'\. Must be a positive integer.")      
+        raise TypeError(f"Invalid party size \'{value}\'. Must be a positive integer.")      
       if value <= 0:
         raise ValueError(f"Invalid party size {value}. Must be a positive integer.")
     elif name == 'tip':
