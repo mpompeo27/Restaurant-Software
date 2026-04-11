@@ -365,15 +365,14 @@ def unassign_tables(*table_numbers):
     # Validate the table has an assignment that can be removed. If not, print a message and continue.
     elif 'name' not in tables[num]:
       print(f"Table number {num} is already empty.")
-    # With the table number and assignment validated, remove each item from the corresponding table number key in the tables dictionary.
+    # With the table number and assignment validated, clear all items except the capacity from the corresponding table number key in the tables dictionary.
     else:
-      tables[num].pop('name')
-      tables[num].pop('vip_status')
-      tables[num].pop('reservation')
-      tables[num].pop('seating_time')
-      tables[num].pop('num_diners')
-      tables[num].pop('order')
-      tables[num].pop('total')
+      # store the capacity value in a variable
+      capacity = tables[num]['capacity']
+      # clear the dict
+      tables[num].clear()
+      # reassign the capacity value
+      tables[num]['capacity'] = capacity  
       print(f"Table number {num} has been cleared.")
   save_data()
 
