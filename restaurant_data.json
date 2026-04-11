@@ -1,0 +1,69 @@
+{
+  "tables": {
+    "1": {
+      "capacity": 2
+    },
+    "2": {
+      "capacity": 2
+    },
+    "3": {
+      "capacity": 4
+    },
+    "4": {
+      "capacity": 4
+    },
+    "5": {
+      "capacity": 4
+    },
+    "6": {
+      "capacity": 6
+    },
+    "7": {
+      "capacity": 8
+    }
+  },
+  "reservations": {
+    "1": [],
+    "2": [],
+    "3": [],
+    "4": [],
+    "5": [],
+    "6": [],
+    "7": []
+  },
+  "reservation_lookup": {},
+  "order_count": 1,
+  "reservation_count": 0,
+  "menu": {
+    "foods": {
+      "Pancakes": 4.0,
+      "Scrambled Eggs": 4.5,
+      "Waffles": 4.5,
+      "Tuna Sandwich": 3.5,
+      "Turkey Club Sandwich": 5.0,
+      "Ham Sandwich": 3.0,
+      "Salad": 2.5,
+      "Soup": 2.0,
+      "Spaghetti": 6.0,
+      "Pork Chops": 8.0,
+      "Chicken Fingers": 5.0,
+      "Steak": 8.5,
+      "Bacon": 1.0,
+      "Sausage": 1.0,
+      "French Fries": 1.75,
+      "Mashed Potatoes": 2.0,
+      "Ice Cream": 2.5
+    },
+    "drinks": {
+      "Orange Juice": 1.5,
+      "Apple Juice": 1.5,
+      "Coca Cola": 2.0,
+      "Sprite": 2.0,
+      "Grape Soda": 1.75,
+      "White Wine": 5.0,
+      "Red Wine": 5.0,
+      "Beer": 3.5,
+      "Sparkling Water": 1.75
+    }
+  }
+}
