@@ -13,8 +13,11 @@ reservation_lookup = {}
 
 menu = {}
 
+max_capacity = 0
+
 # Create function to load data from our json file
 def load_data():
+  global max_capacity
   # Validate the path for the database file
   if os.path.exists(DB_FILE):
     try:
@@ -23,6 +26,8 @@ def load_data():
         data = json.load(db)
       # Restore global state
       tables.update({int(k): v for k, v in data['tables'].items()}) # repopulate tables dict
+      for t in tables:
+        max_capacity += tables[t]['capacity']
       reservations.update({int(k): v for k, v in data['reservations'].items()})
       reservation_lookup.update(data['reservation_lookup'])
       Order.order_count = data['order_count']
@@ -87,12 +92,22 @@ def validate_params(**params):
         raise TypeError(f"Invalid party size \'{value}\'. Must be a positive integer.")      
       if value <= 0:
         raise ValueError(f"Invalid party size {value}. Must be a positive integer.")
+      # Check edge case for party_size greater than maximum capacity.
+      if value > max_capacity:
+        raise ValueError(f"Invalid party size. {value} exceeds maximum restaurant capacity of {max_capacity} persons.")
     elif name == 'tip':
-      # Confirm tip is a number, and that it's between 0 and 100.
+      # Confirm tip is a non-negative number.
       if not isinstance(value, (int, float)):
-        raise TypeError(f"\'{value}\' is not a valid tip percent. Must be a number between 0 and 100.")
-      if 0 <= value <= 100:
-        raise ValueError(f"\'{value}\' is not a valid tip percent. Must be a number between 0 and 100.")
+        raise TypeError(f"\'{value}\' is not a valid tip amount. Must be a number.")
+      if not (0 <= value <= 100):
+        raise ValueError(f"\'{value}\' is not a valid tip amount. Cannot be a negative number.")
+    elif name == 'tips':
+      # Confirm each tip in the tuple is a non-negative number.
+      for tip in value:
+        if not isinstance(tip, (int, float)):
+            raise TypeError(f"'{tip}' is not a valid tip amount. Must be a number.")
+        if tip < 0:
+            raise ValueError(f"'{tip}' is not a valid tip amount. Cannot be a negative number.")
     else:
       # Final error if there is an invalid parameter entirely.
       raise ValueError(f"{name} is not a valid parameter.")
@@ -110,6 +125,8 @@ class Order:
   def __init__(self):
     Order.order_count += 1
     self.order_number = str(Order.order_count).zfill(5)
+    if Order.order_count == (602 * 10**21):
+      print("Congratulations! You've just reached 1 mol of orders! Wow! You're the most popular and successful restaurant in the universe!")
 
 # Define a function to assign tables that will take in a table number, the guest name, the size of the party, whether they have VIP status, if they have a reservation, and the time of their seating. If unspecified, VIP status and reservation will default to false and seating time will default to None before being set inside the function to the current time in UTC-6.
 def assign_table(table_number, name, party_size, vip_status=False, reserve_status=False, time=None): 
@@ -119,7 +136,7 @@ def assign_table(table_number, name, party_size, vip_status=False, reserve_statu
   # Call the validate_params function to run standard checks.
   validate_params(table_number=table_number, name=name, party_size=party_size, vip_status=vip_status, reserve_status=reserve_status, time=time)
   # Check if table is already occupied.
-  if 'name' in tables[table_number]:
+  if tables[table_number]['status'] == 'occupied':
     raise ValueError(f"Table {table_number} is currently occupied.") 
   # Check that the size of the party fits the given table.
   if party_size > tables[table_number]['capacity']:
@@ -131,15 +148,17 @@ def assign_table(table_number, name, party_size, vip_status=False, reserve_statu
       existing_time = datetime.strptime(reservation_lookup[r]['time'], '%H:%M %m-%d-%Y')
       if timedelta(0) < (existing_time - time_obj) < timedelta(hours=1):
         raise ValueError(f"Table {table_number} has an upcoming reservation at {reservation_lookup[r]['time']} and cannot be seated. Table must remain open for the reservation.")
-  # If validation checks are passed, add info to the tables dictionary to assig the table.
-  tables[table_number]['name'] = name
-  tables[table_number]['vip_status'] = vip_status
-  tables[table_number]['reservation'] = reserve_status
-  tables[table_number]['seating_time'] = time
-  tables[table_number]['num_diners'] = party_size
+  # If validation checks are passed, add info to the tables dictionary to assign the table.
+  table = tables[table_number] # assign the table's dictionary to a reference variable for improved readability on repeated calls below
+  table['status'] = 'occupied'
+  table['name'] = name
+  table['vip_status'] = vip_status
+  table['reservation'] = reserve_status
+  table['seating_time'] = time
+  table['num_diners'] = party_size
   new_order = Order()
-  tables[table_number]['order'] = {'ord_number': new_order.order_number}
-  tables[table_number]['total'] = None
+  table['order'] = {'ord_number': new_order.order_number}
+  table['total'] = None
   save_data()
 
 # Function to assign food and drink items to the order for a specific table, taking in the table number and the ordered items with **kwargs used to allow for variable keyword arguments for food and drinks separately. Items must be provided in a list format.
@@ -148,36 +167,42 @@ def add_order_items(table_number, **order_items):
   validate_params(table_number=table_number)
   # Validate order items provided in list form.
   if not all(isinstance(v, list) for v in order_items.values()):
-    raise ValueError("All order items must be provided in separate lists for food and drinks.")
+    raise TypeError("All order items must be provided in separate lists for food and drinks.")
+  # assign the table's order info from the tables dict to a reference variable for improved readability on subsequent calls
+  try:
+    order = tables[table_number]['order']
+  # Raise an error if no order found for the given table
+  except LookupError:
+    raise LookupError(f"No order found for table {table_number}.")
   # Check if there is food in the order and if yes assign the 'food' parameter to a variable called 'foods'.
   if 'food' in order_items:
     foods = order_items.get('food')
     # Check that all items in the foods list are strings. Return ValueError if not.
     if not all(isinstance(item, str) for item in foods):
-      raise ValueError("All food items must be strings.")
-    # Check that all items in foods are on the menu. Return LookupError if not. 
+      raise TypeError("All food items must be strings.")
+    # Check that all items in foods are on the menu. Return LookupError if not.
     if not all(item in menu['foods'] for item in foods):
       raise LookupError("One or more food items are not on the menu.")
     # If all items in foods are properly entered as strings and on the menu, proceed to add to the order.
     # Validate if order already has food items and append to the list if yes.
-    if 'food_items' in tables[table_number]['order']:
+    if 'food_items' in order:
       for f in foods:
-        tables[table_number]['order']['food_items'].append(f)
+        order['food_items'].append(f)
     # Otherwise create the 'food_items' key for this order and set it equal to the list of foods.
     else:
-      tables[table_number]['order']['food_items'] = foods
+      order['food_items'] = foods
   # Repeat the same for drinks.
-  if 'drinks' in order_items: 
+  if 'drinks' in order_items:
     drinks = order_items.get('drinks')
     if not all(isinstance(item, str) for item in drinks):
-      raise ValueError("All drinks must be strings.")
+      raise TypeError("All drinks must be strings.")
     if not all(item in menu['drinks'] for item in drinks):
       raise LookupError("One or more drinks are not on the menu.")
-    if 'drinks' in tables[table_number]['order']:
+    if 'drinks' in order:
       for d in drinks:
-        tables[table_number]['order']['drinks'].append(d)
+        order['drinks'].append(d)
     else:
-      tables[table_number]['order']['drinks'] = drinks
+      order['drinks'] = drinks
   save_data()
       
 # Function to remove food and drink items from a table's order in the case of mistakes, taking in the table number and the items to remove with **kwargs used to allow for variable keyword arguments for food and drinks separately. Items must be provided in a list format.
@@ -186,13 +211,13 @@ def remove_order_items(table_number, **removed_items):
   validate_params(table_number=table_number)
   # Validate order items provided in list form.
   if not all(isinstance(v, list) for v in removed_items.values()):
-    raise ValueError("All items to remove must be provided in separate lists for food and drinks.")  
+    raise TypeError("All items to remove must be provided in separate lists for food and drinks.")  
   # Check if there is food in the removed items. If yes, assign the 'food' argument to a variable called 'remove_foods'.
   if 'food' in removed_items:
     remove_foods = removed_items.get('food')
     # Check that all items in the removed foods list are strings. Return ValueError if not, otherwise remove foods from the order in the tables dictionary.
     if not all(isinstance(item, str) for item in remove_foods):
-      raise ValueError("All food items must be strings.")
+      raise TypeError("All food items must be strings.")
     else:
       for food in remove_foods:
         if food not in tables[table_number]['order']['food_items']:
@@ -203,7 +228,7 @@ def remove_order_items(table_number, **removed_items):
   if 'drinks' in removed_items:  
     remove_drinks = removed_items.get('drinks')  
     if not all(isinstance(item, str) for item in remove_drinks):
-      raise ValueError("All drinks must be strings.")   
+      raise TypeError("All drinks must be strings.")   
     else:
       for drink in remove_drinks:
         if drink not in tables[table_number]['order']['drinks']:
@@ -214,30 +239,32 @@ def remove_order_items(table_number, **removed_items):
 
 # Function that will take in the table number and an operation - either 'add' or 'print' - to iterate through items in the table's order and either sum the prices to get the total or print them all with formatting for the bill.
 def iterate_items(table_number, op):
+  # Store the table's order info in a variable to visually clean up repeated calls below
+  order = tables[table_number]['order']
   if op == 'add':
     # Initialize total to 0.
     total = Decimal(0)
     # Check if the table's order has food, and if yes, iterate through the food_items and add each one's price to the total.
-    if 'food_items' in tables[table_number]['order']:
-      for food in tables[table_number]['order']['food_items']:
+    if 'food_items' in order:
+      for food in order['food_items']:
         item_price = menu['foods'][food]
-        total += Decimal(item_price)      
+        total += Decimal(item_price)
     # Repeat for drinks.
-    if 'drinks' in tables[table_number]['order']:
-      for drink in tables[table_number]['order']['drinks']:
+    if 'drinks' in order:
+      for drink in order['drinks']:
         item_price = menu['drinks'][drink]
         total += Decimal(item_price)
     return total
   elif op == 'print':
-    if 'food_items' in tables[table_number]['order']:
-      for food in tables[table_number]['order']['food_items']:
+    if 'food_items' in order:
+      for food in order['food_items']:
         item_price = menu['foods'][food]
-        print(f"{food:<25} ${item_price:.2f}")
+        print(f"{food:<25}{f'{item_price:.2f}':>10}")
     # Repeat for drinks.
-    if 'drinks' in tables[table_number]['order']:
-      for drink in tables[table_number]['order']['drinks']:
+    if 'drinks' in order:
+      for drink in order['drinks']:
         item_price = menu['drinks'][drink]
-        print(f"{drink:<25} ${item_price:.2f}")
+        print(f"{drink:<25}{f'{item_price:.2f}':>10}")
 
 # Function to calculate the total bill for a table, taking in just the table number as an argument.
 def calc_total(table_number):
@@ -252,37 +279,31 @@ def calc_total(table_number):
   save_data()
   return total
 
-# Function to print the table's bill including tip with no split payment, taking in the table number and tip % with a default tip of 20%.
-def print_bill(table_number, tip=None):
-  # Validate the table number and tip amount.
-  validate_params(table_number=table_number, tip=tip)
-  # Print the order number at the top of the bill.
-  print(f"Order Number: {tables[table_number]['order']['ord_number']}\n")
-  iterate_items(table_number, 'print')
-  total = calc_total(table_number).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-  tip_pct = Decimal(str(tip))/100
-  total_tip = (total * tip_pct).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-  total_bill = (total + total_tip).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-  # Print messages for the order total, tip, and total bill.
-  print(f"\n{'Order:':<25} ${total}")
-  print(f"{f'Tip {tip}%:':<25} ${total_tip}")
-  print(f"{'Total:':<25} ${total_bill}\n")
-  return total_bill
-
-# Function to calculate the price per person for splitting a bill. Takes in the table number as argument and optional number of people splitting the bill with default value None. Actual default value will be set inside the function to the number of diners because it requires referencing the table_number parameter.
-def print_split_bill(table_number, tip=20.0, split=None):
-  # Set the actual default value for split to the number of diners for the table and otherwise validate the value.
-  if split is None:
-    split = tables[table_number]['num_diners']
+# Function to print the table's bill. Takes in the table number and optional number of payors splitting the bill (defaulted to 1), prints the order number at the top, the list of order items and prices, the sub total, per-person split if needed, and then blank lines for the customer to write in their tip and final total.
+def print_bill(table_number, split=1):
+  validate_params(table_number=table_number)
   # Validate the value of the split parameter if not defaulted.
   if not isinstance(split, int):
     raise TypeError(f"Number of people splitting the bill must be a positive integer.")
   if split <= 0:
     raise ValueError(f"Number of people splitting the bill must be a positive integer.")
-  # Call print_bill to validate the table_number and tip parameters, print everything up to the total bill with tip, and returning the total_bill amount for use in calculating the split per person.
-  total_bill = print_bill(table_number, tip)
-  split_price = (total_bill / split).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-  print(f"{f'Per person:':<25} ${split_price}.")
+  # Calculate the sub-total of the order items before tip is added
+  sub_total = calc_total(table_number).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+  # Calculate the split_price outside the print loop
+  split_price = (sub_total / split).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+  # Print the bill n times for the number of people splitting the bill
+  for n in range(split):
+    # Print the order number at the top of the bill.
+    print(f"Order Number: {tables[table_number]['order']['ord_number']}\n")
+    iterate_items(table_number, 'print')    
+    # Print messages for the order total, tip, and total bill.
+    print(f"\n{'Order:':<25}{f'${sub_total}':>10}")
+    # Check if bill is being split multiple ways
+    if split > 1:
+      # If yes, print a line with the individual split amount before the tip line
+      print(f"{f'Your amount:':<25}{f'${split_price}':>10}")
+    print(f"{f'Tip:':<25}__________")
+    print(f"{'Total:':<25}__________\n")
 
 # Create Reservation class for generating unique reservation IDs using a class variable reservation_count to ensure the counter is not modified elsewhere in the code outside the class constructor.
 class Reservation:
@@ -291,6 +312,11 @@ class Reservation:
 
   # Create a class constructor to increment the reservation count and create a unique string for the reservation ID. 
   def __init__(self):
+    # Check the size of reservation count and reset to zero when about to reach 100k
+    if Reservation.reservation_count >= 99999:
+      Reservation.reservation_count = 0
+      print('Reservation max reached. Reservation ID counter reset.')
+    # Increment reservation count and create unique reservation ID string
     Reservation.reservation_count += 1
     self.ID = 'rsv-' + str(Reservation.reservation_count).zfill(5)
 
@@ -328,7 +354,11 @@ def find_reservation(name, time):
       return rsv
   print(f"No reservation found for {name} at {time}.")
 
-# Function to assign tables from reservation IDs when customers arrive at the restaurant. Use **kwargs to take in any number of reservation IDs at once.)
+# Placeholder for function to modify an existing reservation. Note for the future, kwarg new_table will need to become *new_tables or accept a list input. 
+def modify_reservation(reservation_ID, new_table=None, new_name=None, new_party_size=None, new_time=None, new_vip_status=None):
+  pass
+
+# Function to assign tables from reservation IDs when customers arrive at the restaurant. Use *args to take in any number of reservation IDs at once.
 def assign_table_from_reservation(*reservation_IDs):
   # Validate reservation IDs correctly entered and return a ValueError if not.
   if not all(isinstance(rsv_ID, str) for rsv_ID in reservation_IDs):
@@ -341,16 +371,23 @@ def assign_table_from_reservation(*reservation_IDs):
       continue
     # For each valid reservation ID, pull the relevant info from the reservation lookup dict and call the assign_table function using the reservation info for the arguments.
     else:
-      name = reservation_lookup[rsv_ID]['name']
-      vip_status = reservation_lookup[rsv_ID]['vip_status']
-      time = reservation_lookup[rsv_ID]['time']
-      table_number = reservation_lookup[rsv_ID]['table']
-      party_size = reservation_lookup[rsv_ID]['num_diners']
+      rsv = reservation_lookup[rsv_ID]
+      name = rsv['name']
+      vip_status = rsv['vip_status']
+      time = rsv['time']
+      table_number = rsv['table']
+      party_size = rsv['num_diners']
       assign_table(table_number, name, party_size, vip_status, True, time)
       # Remove the reservation ID from the reservations and reservation_lookup dictionaries now that the guests have arrived and been assigned to the table.
       reservations[table_number].remove(rsv_ID)
       del reservation_lookup[rsv_ID]
   save_data()
+
+# Placeholder for function to close an order, taking in the order_number and the tip amount(s) left by the party. Uses variable *tips to account for split bills to enter each payor's tip amount.
+def close_order(order_number, *tips):
+  # Check tip amounts
+  validate_params(tips=tips)
+  pass
 
 # Function to remove tables' guests when they leave the restaurant. Uses *args to accept a variable amount of table numbers to remove at once.
 def unassign_tables(*table_numbers):
@@ -363,7 +400,7 @@ def unassign_tables(*table_numbers):
     if num not in tables:
       print(f"There is no table number {num}!")
     # Validate the table has an assignment that can be removed. If not, print a message and continue.
-    elif 'name' not in tables[num]:
+    elif tables[num]['status'] == 'available':
       print(f"Table number {num} is already empty.")
     # With the table number and assignment validated, clear all items except the capacity from the corresponding table number key in the tables dictionary.
     else:
@@ -372,7 +409,8 @@ def unassign_tables(*table_numbers):
       # clear the dict
       tables[num].clear()
       # reassign the capacity value
-      tables[num]['capacity'] = capacity  
+      tables[num]['capacity'] = capacity
+      tables[num]['status'] = 'available'  
       print(f"Table number {num} has been cleared.")
   save_data()
 
@@ -381,6 +419,7 @@ print(tables)
 print(reservations)
 print(reservation_lookup)
 print(menu)
+print_bill(7, 2)
 
 #assign_table(1, 'Jiho', 2)
 #add_order_items(1, food=['Pancakes'], drinks=['Orange Juice', 'Apple Juice'])
