@@ -65,13 +65,21 @@ def validate_params(**params):
         raise TypeError(f"Invalid table number \'{value}\'. Must be an integer number.")
       if value not in tables:
         raise ValueError(f"There is no table number {value}!")
+    elif name == 'table_numbers':
+      # Confirm at least one table number was entered
+      if not value:
+        raise ValueError("At least one table number must be provided.")
+      # Check each table in the tuple for integer value that exists in the tables dict
+      for table in value:
+        # Confirm table number is an integer and it exists in the tables dict. 
+        if not isinstance(table, int):
+          raise TypeError(f"Invalid table number \'{table}\'. Must be an integer number.")
+        if table not in tables:
+          raise ValueError(f"There is no table number {table}!")
     elif name == 'name':
       # Confirm name is a string.
       if not isinstance(value, str):
-        raise TypeError(f"Invalid name {value}. Must be a string.")
-      # Confirm string is not empty.
-      if not value:
-        raise ValueError(f"Invalid name. Name must not be blank.")
+        raise TypeError(f"Invalid name {value}. Must be a string.")      
     elif name == 'vip_status':
       # Confirm vip_status is a boolean.
       if not isinstance(value, bool):
@@ -81,33 +89,41 @@ def validate_params(**params):
       if not isinstance(value, bool):
         raise TypeError(f"Invalid reservation status {value}. Must be True or False.")
     elif name == 'time':
-      # Validate time entered as a string formatted correctly as 24 hr time and date HH:MM mm-dd-yyyy.
+      # Confirm time is a string
+      if not isinstance(value, str):
+        raise TypeError(f"Invalid seating time {value}. Time must be a string formatted as HH:MM mm-dd-yyyy (e.g. '14:30 03-20-2026').")
+      # Validate time string formatted correctly as 24 hr time and date HH:MM mm-dd-yyyy.
       try:
         datetime.strptime(value, '%H:%M %m-%d-%Y')
       except ValueError:
         raise ValueError("Seating time must be formatted as HH:MM mm-dd-yyyy (e.g. '14:30 03-20-2026').")
     elif name == 'party_size':
-      # Confirm party_size is an integer.
-      if not isinstance(value, int):
-        raise TypeError(f"Invalid party size \'{value}\'. Must be a positive integer.")      
+      # Confirm party_size is an integer and non-boolean.
+      if (not isinstance(value, int)) or isinstance(value, bool):
+        raise TypeError(f"Invalid party size \'{value}\'. Must be a positive integer.")
+      # Confirm integer value is positive      
       if value <= 0:
         raise ValueError(f"Invalid party size {value}. Must be a positive integer.")
       # Check edge case for party_size greater than maximum capacity.
       if value > max_capacity:
         raise ValueError(f"Invalid party size. {value} exceeds maximum restaurant capacity of {max_capacity} persons.")
     elif name == 'tip':
-      # Confirm tip is a non-negative number.
-      if not isinstance(value, (int, float)):
+      # Confirm tip is a number and non-boolean.
+      if (not isinstance(value, (int, float))) or isinstance(value, bool):
         raise TypeError(f"\'{value}\' is not a valid tip amount. Must be a number.")
-      if not (0 <= value <= 100):
+      # Confirm tip is a non-negative number.
+      if value < 0:
         raise ValueError(f"\'{value}\' is not a valid tip amount. Cannot be a negative number.")
     elif name == 'tips':
+      # Confirm at least one tip amount was entered
+      if not value:
+        raise ValueError("At least one tip amount must be provided.")
       # Confirm each tip in the tuple is a non-negative number.
       for tip in value:
-        if not isinstance(tip, (int, float)):
-            raise TypeError(f"'{tip}' is not a valid tip amount. Must be a number.")
+        if (not isinstance(tip, (int, float))) or isinstance(tip, bool):
+            raise TypeError(f"\'{tip}\' is not a valid tip amount. Must be a non-negative number.")
         if tip < 0:
-            raise ValueError(f"'{tip}' is not a valid tip amount. Cannot be a negative number.")
+            raise ValueError(f"{tip} is not a valid tip amount. Must be a non-negative number.")
     else:
       # Final error if there is an invalid parameter entirely.
       raise ValueError(f"{name} is not a valid parameter.")
@@ -128,37 +144,57 @@ class Order:
     if Order.order_count == (602 * 10**21):
       print("Congratulations! You've just reached 1 mol of orders! Wow! You're the most popular and successful restaurant in the universe!")
 
-# Define a function to assign tables that will take in a table number, the guest name, the size of the party, whether they have VIP status, if they have a reservation, and the time of their seating. If unspecified, VIP status and reservation will default to false and seating time will default to None before being set inside the function to the current time in UTC-6.
-def assign_table(table_number, name, party_size, vip_status=False, reserve_status=False, time=None): 
+# Define a function to assign tables that will take variable *table_numbers to accommodate combining tables, the guest name, the size of the party, whether they have VIP status, if they have a reservation, and the time of their seating. If unspecified, name will default to 'Customer', VIP status and reservation will default to false and seating time will default to None before being set inside the function to the current time in UTC-6.
+def assign_table(*table_numbers, name='Customer', party_size, vip_status=False, reserve_status=False, time=None): 
   # Set the actual default value for time to the current time.
   if time is None:
     time = datetime.now(timezone(timedelta(hours=-6))).strftime('%H:%M %m-%d-%Y')
+  # Force blank name entries '' or '    ' to the default value 'Customer'
+  if not name.strip():
+    name = 'Customer'
   # Call the validate_params function to run standard checks.
-  validate_params(table_number=table_number, name=name, party_size=party_size, vip_status=vip_status, reserve_status=reserve_status, time=time)
-  # Check if table is already occupied.
-  if tables[table_number]['status'] == 'occupied':
-    raise ValueError(f"Table {table_number} is currently occupied.") 
-  # Check that the size of the party fits the given table.
-  if party_size > tables[table_number]['capacity']:
-    raise ValueError(f"Party size {party_size} is too large for table {table_number}. Seating capacity is only {tables[table_number]['capacity']}.")
-  # If table is being assigned without a reservation, check the seating time against existing reservations to make sure there is no conflict with an upcoming reservation within 1 hour for which the table needs to remain open. This check is not needed if the table is being assigned from a reservation because the reservation system already checks to ensure reservations for a given table are sufficiently spaced out.
-  if reserve_status == False:
-    time_obj = datetime.strptime(time, '%H:%M %m-%d-%Y')
-    for r in reservations[table_number]:
-      existing_time = datetime.strptime(reservation_lookup[r]['time'], '%H:%M %m-%d-%Y')
-      if timedelta(0) < (existing_time - time_obj) < timedelta(hours=1):
-        raise ValueError(f"Table {table_number} has an upcoming reservation at {reservation_lookup[r]['time']} and cannot be seated. Table must remain open for the reservation.")
-  # If validation checks are passed, add info to the tables dictionary to assign the table.
-  table = tables[table_number] # assign the table's dictionary to a reference variable for improved readability on repeated calls below
-  table['status'] = 'occupied'
-  table['name'] = name
-  table['vip_status'] = vip_status
-  table['reservation'] = reserve_status
-  table['seating_time'] = time
-  table['num_diners'] = party_size
+  validate_params(table_numbers=table_numbers, name=name, party_size=party_size, vip_status=vip_status, reserve_status=reserve_status, time=time)
+  # Initialize datetime object from the time argument before entering loop. Value remains constant and does not need to be repeated on each loop iteration.
+  time_obj = datetime.strptime(time, '%H:%M %m-%d-%Y')
+  # Initialize variable for the combined capacity of all tables.
+  combined_capacity = 0
+  # Iterate through table numbers to check each one's status and compare seating time to upcoming reservations.
+  for table_number in table_numbers:
+    # Check if table is already occupied.
+    if tables[table_number]['status'] == 'occupied':
+      raise ValueError(f"Table {table_number} is currently occupied.")   
+    # If table is being assigned without a reservation, check the seating time against existing reservations to make sure there is no conflict with an upcoming reservation within 1 hour for which the table needs to remain open. This check is not needed if the table is being assigned from a reservation because the reservation system already checks to ensure reservations for a given table are sufficiently spaced out.
+    if reserve_status == False:      
+      for r in reservations[table_number]:
+        existing_time = datetime.strptime(reservation_lookup[r]['time'], '%H:%M %m-%d-%Y')
+        if timedelta(0) < (existing_time - time_obj) < timedelta(hours=1):
+          raise ValueError(f"Table {table_number} has an upcoming reservation at {reservation_lookup[r]['time']} and cannot be seated. Table must remain open for the reservation.")
+    # If no errors raised for the table status being occupied or time conflict with a reservation, add the table's capacity to combined_capacity
+    combined_capacity += tables[table_number]['capacity']
+  # Check the size of the party against the combined capacity of tables given.
+  if party_size > combined_capacity:
+    raise ValueError(f"Party size {party_size} is too large for table(s) {', '.join(str(t) for t in table_numbers)}. Seating capacity is only {combined_capacity}.")
+  # If all validation checks are passed, select first table number as the primary for the party.
+  primary_num = table_numbers[0]
+  primary_table = tables[primary_num] # assign the primary table's dictionary to a reference variable for improved readability on repeated calls below
+  primary_table['name'] = name
+  primary_table['vip_status'] = vip_status
+  primary_table['reservation'] = reserve_status
+  primary_table['seating_time'] = time
+  primary_table['num_diners'] = party_size
   new_order = Order()
-  table['order'] = {'ord_number': new_order.order_number}
-  table['total'] = None
+  primary_table['order'] = {'ord_number': new_order.order_number}
+  primary_table['total'] = None
+  # Check if only 1 table and if yes, set primary table's status to occupied and set 'linked_tables' key to an empty list
+  if len(table_numbers) == 1:
+    primary_table['status'] = 'occupied'
+    primary_table['linked_tables'] = []
+  # Otherwise iterate through table_numbers to set all statuses to 'occupied' and create data linkage between the combined tables 
+  else:
+    for table_number in table_numbers:
+      tables[table_number]['status'] = 'occupied'
+      # Use list comprehension to set the table's 'linked_tables' key to a list of only the other table numbers
+      tables[table_number]['linked_tables'] = [t for t in table_numbers if t != table_number]
   save_data()
 
 # Function to assign food and drink items to the order for a specific table, taking in the table number and the ordered items with **kwargs used to allow for variable keyword arguments for food and drinks separately. Items must be provided in a list format.
@@ -321,32 +357,48 @@ class Reservation:
     self.ID = 'rsv-' + str(Reservation.reservation_count).zfill(5)
 
 # Function to add a reservation to the reservations queue. It will take in the table number, the time of the reservation, the customer name, and their VIP status and create a Reservation class object to generate a reservation ID. If not specified, VIP status will default to False. The reservation ID will be added to the reservations dictionary in a list for the designated table, and the reservation info details will be added to the reservation_lookup dictionary under the reservation number. A message will print confirming the reservation was made successfully.
-def add_reservation(table_number, time, name, party_size, vip_status=False):
+def add_reservation(*table_numbers, time, name, party_size, vip_status=False):  
   # Call the validate_params function to run standard checks.
-  validate_params(table_number=table_number, time=time, name=name, party_size=party_size, vip_status=vip_status)
+  validate_params(table_numbers=table_numbers, time=time, name=name, party_size=party_size, vip_status=vip_status)
+  # Check for blank name entry like '' or '   ' and return error
+  if not name.strip():
+    raise ValueError('Name must not be blank. Please enter valid name.')
+  # Initialize variable for combined capacity of table numbers
+  combined_capacity = 0
+  #Initialize variable for datetime object from the time argument to use in check against existing reservation times
+  requested_time = datetime.strptime(time, '%H:%M %m-%d-%Y') 
+  # Iterate through the given table numbers
+  for table_number in table_numbers:
+    # Check that the requested reservation time isn't too close to an existing reservation for the same table so customers with reservations are not waiting for the table to become available when they arrive.    
+    for r in reservations[table_number]:
+      existing_time = datetime.strptime(reservation_lookup[r]['time'], '%H:%M %m-%d-%Y')
+      if abs(requested_time - existing_time) < timedelta(hours=1):
+        raise ValueError(f"Table {table_number} already has a reservation at {reservation_lookup[r]['time']}, which is less than 1 hour from {time}.")
+    # Add current table capacity to combined_capacity
+    combined_capacity += tables[table_number]['capacity']
   # Check that the size of the party fits the given table.
-  if party_size > tables[table_number]['capacity']:
-    raise ValueError(f"Party size {party_size} is too large for table {table_number}. Seating capacity is only {tables[table_number]['capacity']}.")
-  # Check that the requested reservation time isn't too close to an existing reservation for the same table so customers with reservations are not waiting for the table to become available when they arrive.
-  requested_time = datetime.strptime(time, '%H:%M %m-%d-%Y')
-  for r in reservations[table_number]:
-    existing_time = datetime.strptime(reservation_lookup[r]['time'], '%H:%M %m-%d-%Y')
-    if abs(requested_time - existing_time) < timedelta(hours=1):
-      raise ValueError(f"Table {table_number} already has a reservation at {reservation_lookup[r]['time']}, which is less than 1 hour from {time}.")
+  if party_size > combined_capacity:
+    raise ValueError(f"Party size {party_size} is too large for table(s) {', '.join(str(t) for t in table_numbers)}. Seating capacity is only {combined_capacity}.")
   # Create the reservation class object to generate the reservation ID.
   reserve_obj = Reservation()
+  # Generate list of the reserved table numbers
+  reserved_tables = list(table_numbers)
   # Call the reservation's info dictionary attribute
   reservation_ID = reserve_obj.ID
-  reservation_info = {'name': name, 'time': time, 'num_diners': party_size, 'vip_status': vip_status, 'table': table_number}
-  reservations[table_number].append(reservation_ID)
+  reservation_info = {'name': name, 'time': time, 'num_diners': party_size, 'vip_status': vip_status, 'tables': reserved_tables}
+  for table in reserved_tables:
+    reservations[table].append(reservation_ID)
   reservation_lookup[reservation_ID] = reservation_info
-  print(f"Table {table_number} has been reserved for {name} at {time} with reservation number {reserve_obj.ID}. Their VIP status is {vip_status}.")
+  print(f"Reservation number {reservation_ID} created for {name} at {time} on table(s) {', '.join(str(t) for t in reserved_tables)}. Their VIP status is {vip_status}.")
   save_data()
 
 # Function to find a customer's reservation ID from their name and reservation time.
 def find_reservation(name, time):
   # Call the validate_params function to run standard checks.
   validate_params(name=name, time=time)
+  # Check for blank name entry like '' or '   ' and return error
+  if not name.strip():
+    raise ValueError('Name must not be blank. Please enter valid name.')
   # Iterate through each reservation in the lookup dictionary and match by name and time.
   for rsv in reservation_lookup:
     if reservation_lookup[rsv]['name'] == name and reservation_lookup[rsv]['time'] == time:
@@ -357,6 +409,22 @@ def find_reservation(name, time):
 # Placeholder for function to modify an existing reservation. Note for the future, kwarg new_table will need to become *new_tables or accept a list input. 
 def modify_reservation(reservation_ID, new_table=None, new_name=None, new_party_size=None, new_time=None, new_vip_status=None):
   pass
+
+# Function to cancel an existing reservation. Will take in the reservation ID, clear that ID from all relevant tables in the reservations dict, and clear the reservation ID's dict from reservation_lookup.
+def cancel_reservation(reservation_ID):
+  # Validate reservation_ID entered as a string
+  if not isinstance(reservation_ID, str):
+    raise TypeError("Reservation ID must be a string.")
+  # Validate that the reservation ID exists
+  elif reservation_ID not in reservation_lookup:
+    raise ValueError(f"No reservation found with ID {reservation_ID}.")
+  # If checks passed, remove the reservation from all linked tables in the reservations dict and clear it from reservation_lookup
+  else:
+    reserved_tables = reservation_lookup[reservation_ID]['tables']
+    for t in reserved_tables:
+      reservations[t].remove(reservation_ID)
+    del reservation_lookup[reservation_ID]
+  save_data()
 
 # Function to assign tables from reservation IDs when customers arrive at the restaurant. Use *args to take in any number of reservation IDs at once.
 def assign_table_from_reservation(*reservation_IDs):
@@ -375,11 +443,12 @@ def assign_table_from_reservation(*reservation_IDs):
       name = rsv['name']
       vip_status = rsv['vip_status']
       time = rsv['time']
-      table_number = rsv['table']
+      table_numbers = rsv['tables']
       party_size = rsv['num_diners']
-      assign_table(table_number, name, party_size, vip_status, True, time)
+      assign_table(*table_numbers, name=name, party_size=party_size, vip_status=vip_status, reserve_status=True, time=time)
       # Remove the reservation ID from the reservations and reservation_lookup dictionaries now that the guests have arrived and been assigned to the table.
-      reservations[table_number].remove(rsv_ID)
+      for table_number in table_numbers:
+        reservations[table_number].remove(rsv_ID)
       del reservation_lookup[rsv_ID]
   save_data()
 
@@ -390,7 +459,7 @@ def close_order(order_number, *tips):
   pass
 
 # Function to remove tables' guests when they leave the restaurant. Uses *args to accept a variable amount of table numbers to remove at once.
-def unassign_tables(*table_numbers):
+def clear_tables(*table_numbers):
   # Validate that all table number arguments are integer numbers.
   if not all(isinstance(num, int) for num in table_numbers):
     raise TypeError("All table numbers must be integers.")
@@ -404,14 +473,22 @@ def unassign_tables(*table_numbers):
       print(f"Table number {num} is already empty.")
     # With the table number and assignment validated, clear all items except the capacity from the corresponding table number key in the tables dictionary.
     else:
-      # store the capacity value in a variable
-      capacity = tables[num]['capacity']
-      # clear the dict
-      tables[num].clear()
-      # reassign the capacity value
-      tables[num]['capacity'] = capacity
-      tables[num]['status'] = 'available'  
-      print(f"Table number {num} has been cleared.")
+      # Combine the current table number in a list with its 'linked_tables' to clear all
+      tables_to_clear = [num] + tables[num]['linked_tables']
+      # Iterate through tables to clear
+      for t in tables_to_clear:
+        # store the capacity value in a variable
+        capacity = tables[t]['capacity']
+        # clear the dict
+        tables[t].clear()
+        # reassign the capacity value
+        tables[t]['capacity'] = capacity
+        tables[t]['status'] = 'available'
+        # Print different messages for the first table in the list vs the linked tables
+        if t == num:  
+          print(f'Table number {num} has been cleared.')
+        else:
+          print(f'Linked table {t} has been cleared.')
   save_data()
 
 load_data()
@@ -419,40 +496,3 @@ print(tables)
 print(reservations)
 print(reservation_lookup)
 print(menu)
-print_bill(7, 2)
-
-#assign_table(1, 'Jiho', 2)
-#add_order_items(1, food=['Pancakes'], drinks=['Orange Juice', 'Apple Juice'])
-#print(str(tables) + '\n')
-
-#assign_table(3, 'Jim', 4, True)
-#add_order_items(3, food=['Spaghetti', 'Salad'], drinks=['White Wine'])
-#print(str(tables) + '\n')
-
-#assign_table(7, 'Mary', 7, True)
-#add_order_items(7, food=['Salad', 'Pork Chops'])
-#print(str(tables) + '\n')
-
-#print_bill(3)
-#print_split_bill(3, split=2)
-#print(str(tables) + '\n')
-
-#remove_order_items(1, drinks=['Apple Juice'])
-#print(str(tables) + '\n')
-
-#unassign_tables(3, 12, 2)
-#print(str(tables) + '\n')
-
-#add_reservation(4, '17:00 03-25-2026', "Mark", 4)
-#add_reservation(6, '17:00 03-25-2026', "Davis", 5)
-#add_reservation(2, '15:30 03-23-2026', "Roger", 2, True)
-#print(str(reservations) + '\n')
-
-#rsv1 = find_reservation('Mark', '17:00 03-25-2026')
-#print(rsv1)
-#rsv2 = find_reservation('Davis', '15:30 03-25-2026')
-#reserve_list = [rsv1, rsv2]
-
-#assign_table_from_reservation(*reserve_list)
-#print(tables)
-#print(str(reservations) + '\n')
