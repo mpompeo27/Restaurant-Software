@@ -144,6 +144,81 @@ class RestaurantFunctionTests(unittest.TestCase):
     with self.assertRaises(ValueError, msg='Party size greater than combined table capacity did not raise ValueError.'):
       rbs.assign_table(7, 3, name='John', party_size=13, vip_status=True, reserve_status=False)
 
+  # Test the validation checks inside validate_params and check_param
+  def test_parameter_checks(self):
+    # Test invalid single table_number
+    # Test for a non-integer value
+    with self.assertRaises(TypeError, msg='Non-integer table_number did not raise TypeError.'):
+      rbs.validate_params(table_number='five')
+    # Test table_number does not exist in tables dict
+    with self.assertRaises(ValueError, msg='Non-existent table_number did not raise ValueError.'):
+      rbs.validate_params(table_number=9)
+    # Test invalid multiple table_numbers.
+    # Test for no values
+    with self.assertRaises(ValueError, msg='Empty table_numbers tuple with no values did not raise ValueError.'):
+      rbs.validate_params(table_numbers=())
+    # Test for a non-integer value
+    with self.assertRaises(TypeError, msg='Non-integer value in table_numbers tuple did not raise TypeError.'):
+      rbs.validate_params(table_numbers=(2, 'five'))
+    # Test for table number that does not exist in tables dict
+    with self.assertRaises(ValueError, msg='Non-existent table number in table_numbers tuple did not raise ValueError.'):
+      rbs.validate_params(table_numbers=(9, 4))
+    # Test non-string value for name
+    with self.assertRaises(TypeError, msg='Non-string name did not raise TypeError.'):
+      rbs.validate_params(name=('John', 'Schwartz'))
+    # Test non-boolean vip_status
+    with self.assertRaises(TypeError, msg='Non-boolean vip_status did not raise TypeError.'):
+      rbs.validate_params(vip_status='True')
+    # Test non-boolean reserve_status
+    with self.assertRaises(TypeError, msg='Non-boolean reserve_status did not raise TypeError.'):
+      rbs.validate_params(reserve_status='False')
+    # Test invalid time values
+    # Test non-string time
+    with self.assertRaises(TypeError, msg='Time not entered as a string did not raise TypeError.'):
+      rbs.validate_params(time=10)
+    # Test incorrectly formatted time string - required format is HH:MM mm-dd-yyyy
+    with self.assertRaises(ValueError, msg='Incorrectly formatted time string did not raise TypeError.'):
+      rbs.validate_params(time='04-29-2026 15:00')
+    # Test invalid party_size values
+    # Test non-integer party_size
+    with self.assertRaises(TypeError, msg='Non-integer party_size did not raise TypeError.'):
+      rbs.validate_params(party_size='four')
+     # Test boolean party_size
+    with self.assertRaises(TypeError, msg='Boolean party_size did not raise TypeError.'):
+      rbs.validate_params(party_size=True)
+    # Test non-positive integer party_size
+    with self.assertRaises(ValueError, msg='Non-positive integer party_size did not raise ValueError.'):
+      rbs.validate_params(party_size=-5)
+    # Test party_size greater than max_capacity
+    with self.assertRaises(ValueError, msg='party_size greater than max_capacity did not raise ValueError.'):
+      rbs.validate_params(party_size=1000000)
+    # Test single tip value
+    # Test non-numeric tip
+    with self.assertRaises(TypeError, msg='Non-numeric tip amount did not raise TypeError.'):
+      rbs.validate_params(tip='four')
+    # Test boolean tip
+    with self.assertRaises(TypeError, msg='Boolean tip value did not raise TypeError.'):
+      rbs.validate_params(tip=True)
+    # Test negative tip amount
+    with self.assertRaises(ValueError, msg='Negative tip amount did not raise ValueError.'):
+      rbs.validate_params(tip=-5.73)
+    # Test multiple tips values
+    # Test for no values
+    with self.assertRaises(ValueError, msg='Empty tips tuple with no values did not raise ValueError.'):
+      rbs.validate_params(tips=())
+    # Test non-numeric tip amount
+    with self.assertRaises(TypeError, msg='Non-numeric value in tips tuple did not raise TypeError.'):
+      rbs.validate_params(tips=('four', 3.72))
+    # Test boolean tip
+    with self.assertRaises(TypeError, msg='Boolean value in tips tuple did not raise TypeError.'):
+      rbs.validate_params(tips=(4.23, True))
+    # Test negative tip amount
+    with self.assertRaises(ValueError, msg='Negative value in tips tuple did not raise ValueError.'):
+      rbs.validate_params(tips=(6.24, -5.73))
+    # Test invalid parameter name
+    with self.assertRaises(ValueError, msg='Invalid parameter name did not raise ValueError.'):
+      rbs.validate_params(table_nubmer=6)
+
     # tear down test fixture by wiping slate clean again and saving to the JSON to keep the file clear of any table assignments and reservations created saved to the file by the tests
   def tearDown(self):
     rbs.tables.clear()
@@ -198,4 +273,3 @@ class RestaurantFunctionTests(unittest.TestCase):
     rbs.save_data()
 
 unittest.main()
-
