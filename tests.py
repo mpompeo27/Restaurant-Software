@@ -2,6 +2,8 @@ import unittest
 import Restaurant_Business_Software as rbs
 from datetime import datetime, timezone, timedelta
 import json, os
+from unittest.mock import patch
+from io import StringIO
 
 # Create unit testing class
 class RestaurantFunctionTests(unittest.TestCase):
@@ -364,10 +366,17 @@ class RestaurantFunctionTests(unittest.TestCase):
     self.assertEqual(rbs.tables[1], {'capacity': 2, 'status': 'occupied', 'name': 'John', 'num_diners': 2, 'vip_status': False, 'has_reservation': False, 'seating_time': datetime.now(timezone(timedelta(hours=-6))).strftime('%H:%M %m-%d-%Y'), 'order': {'ord_number': '00001'}, 'total': None, 'linked_tables': []}, 'Full single table assignment info for table 2 does not match expected values.')
     # Confirm reservations table was not altered.
     self.assertEqual(rbs.reservations[1], [], 'Table 1 reservations modified from an empty list.')
-    # Check that a different table number was not modified
-    self.assertEqual(rbs.tables[2]['status'], 'available', 'Other table number 2 status set to \'occupied\'.')
-    self.assertNotIn('name', rbs.tables[5], 'Other table number 5 has a \'name\' key.')
-  
+    # Check full tables dict to confirm no other tables were modified
+    self.assertEqual(rbs.tables, {
+      1: {'capacity': 2, 'status': 'occupied', 'name': 'John', 'num_diners': 2, 'vip_status': False, 'has_reservation': False, 'seating_time': datetime.now(timezone(timedelta(hours=-6))).strftime('%H:%M %m-%d-%Y'), 'order': {'ord_number': '00001'}, 'total': None, 'linked_tables': []},
+      2: {'capacity': 2, 'status': 'available'},
+      3: {'capacity': 4, 'status': 'available'},
+      4: {'capacity': 4, 'status': 'available'},
+      5: {'capacity': 4, 'status': 'available'},
+      6: {'capacity': 6, 'status': 'available'},
+      7: {'capacity': 8, 'status': 'available'}
+    }, 'Full tables dict does not match expected values after single table assignment.')
+
   # test to check the results of assigning combined tables
   def test_assign_combined_tables(self):
     rbs.assign_table(7, 3, 4, name='John', party_size=15)
@@ -407,9 +416,16 @@ class RestaurantFunctionTests(unittest.TestCase):
     self.assertEqual(rbs.tables[4], {'capacity': 4, 'status': 'occupied', 'linked_tables': [7, 3]}, 'Full table assignment info for non-primary table 4 does not match expected values.')
     # Confirm reservations table was not altered.
     self.assertEqual(rbs.reservations[7], [], 'Primary table 7 reservations modified from an empty list.')
-    # Check that a different table number was not modified
-    self.assertEqual(rbs.tables[2]['status'], 'available', 'Other table number 2 status set to \'occupied\'.')
-    self.assertNotIn('name', rbs.tables[5], 'Other table number 5 has a \'name\' key.')
+    # Check full tables dict to confirm no other tables were modified
+    self.assertEqual(rbs.tables, {
+      1: {'capacity': 2, 'status': 'available'},
+      2: {'capacity': 2, 'status': 'available'},
+      3: {'capacity': 4, 'status': 'occupied', 'linked_tables': [7, 4]},
+      4: {'capacity': 4, 'status': 'occupied', 'linked_tables': [7, 3]},
+      5: {'capacity': 4, 'status': 'available'},
+      6: {'capacity': 6, 'status': 'available'},
+      7: {'capacity': 8, 'status': 'occupied', 'name': 'John', 'num_diners': 15, 'vip_status': False, 'has_reservation': False, 'seating_time': datetime.now(timezone(timedelta(hours=-6))).strftime('%H:%M %m-%d-%Y'), 'order': {'ord_number': '00001'}, 'total': None, 'linked_tables': [3, 4]}
+    }, 'Full tables dict does not match expected values after combined table assignment.')
 
   # test for the contextual checks of the assign_table arguments
   def test_assign_table_arguments(self):
@@ -495,8 +511,8 @@ class RestaurantFunctionTests(unittest.TestCase):
     self.assertEqual(rbs.reservation_lookup['rsv-00001'], {'name': 'John', 'reserved_time': '19:00 05-07-2026', 'num_diners': 11, 'tables': [6, 1, 5], 'vip_status': False}, 'Full reservation info for rsv-00001 does not match expected values for combined table reservation.')
     # Check that the main tables dict was not modified by add_reservation
     self.assertEqual(rbs.tables[6], {'capacity': 6, 'status': 'available'}, 'Tables dict entry for table 6 was incorrectly modified by add_reservation with combined tables.')
-    self.assertEqual(rbs.tables[1], {'capacity': 2, 'status': 'available'}, 'Tables dict entry for table 6 was incorrectly modified by add_reservation with combined tables.')
-    self.assertEqual(rbs.tables[5], {'capacity': 4, 'status': 'available'}, 'Tables dict entry for table 6 was incorrectly modified by add_reservation with combined tables.')
+    self.assertEqual(rbs.tables[1], {'capacity': 2, 'status': 'available'}, 'Tables dict entry for table 1 was incorrectly modified by add_reservation with combined tables.')
+    self.assertEqual(rbs.tables[5], {'capacity': 4, 'status': 'available'}, 'Tables dict entry for table 5 was incorrectly modified by add_reservation with combined tables.')
 
   def test_add_reservation_parameters(self):
     # Check empty string name entry
@@ -513,7 +529,394 @@ class RestaurantFunctionTests(unittest.TestCase):
     # Table 2 with capacity=2 used for reservation of party of 4
     with self.assertRaises(ValueError, msg='Reservation party size greater than table capacity did not raise ValueError. Check_seating_capacity call failed.'):
       rbs.add_reservation(2, time='18:30 05-02-2026', name='John', party_size=4)
+
+  # test find_reservation function
+  def test_find_reservation(self):
+    # create reservation to search for
+    rbs.Reservation.reservation_count = 1
+    rbs.reservations[5] = ['rsv-00001']
+    rbs.reservation_lookup['rsv-00001'] = {'name': 'Mark', 'reserved_time': '19:00 05-02-2026', 'num_diners': 4, 'vip_status': False, 'tables': [5]}
+    # check reservation ID successfully returned
+    self.assertEqual(rbs.find_reservation('Mark', '19:00 05-02-2026'), 'rsv-00001', 'find_reservation did not correctly return the reservation ID.')
+    # Confirm that the search only read data from reservation_lookup without modifying it - use a full dict equality check
+    self.assertEqual(rbs.reservation_lookup, {'rsv-00001': {'name': 'Mark', 'reserved_time': '19:00 05-02-2026', 'num_diners': 4, 'vip_status': False, 'tables': [5]}}, 'find_reservation inadvertently modified reservation_lookup.')
+    # Check empty name string
+    with self.assertRaises(ValueError, msg='Blank name string did not return ValueError in find_reservation.'):
+      rbs.find_reservation('', '19:00 05-02-2026')
+    # Check no matching reservation for the given name and time
+    self.assertIsNone(rbs.find_reservation('Mark', '19:00 05-10-2026'), 'find_reservation did not return None when searching a name and time with no corresponding reservation.')
+
+  # test canceL_reservation function
+  def test_cancel_reservation(self):
+    # create two reservations to cancel - one single table, one combined tables - and one that won't be canceled
+    rbs.Reservation.reservation_count = 3
+    rbs.reservations[5] = ['rsv-00001']
+    rbs.reservation_lookup['rsv-00001'] = {'name': 'Mark', 'reserved_time': '19:00 05-10-2026', 'num_diners': 4, 'vip_status': False, 'tables': [5]}
+    rbs.reservations[1] = ['rsv-00002']
+    rbs.reservations[3] = ['rsv-00002']
+    rbs.reservations[7] = ['rsv-00002']
+    rbs.reservation_lookup['rsv-00002'] = {'name': 'John', 'reserved_time': '19:00 05-10-2026', 'num_diners': 14, 'vip_status': False, 'tables': [7, 1, 3]}
+    rbs.reservations[4] = ['rsv-00003']
+    rbs.reservation_lookup['rsv-00003'] = {'name': 'Dave', 'reserved_time': '19:00 05-10-2026', 'num_diners': 4, 'vip_status': True, 'tables': [4]}
+    # check non-string reservation ID
+    with self.assertRaises(TypeError, msg='Non-string reservation ID did not return TypeError from cancel_reservation.'):
+      rbs.cancel_reservation(1)
+    # check reservation ID not found
+    with self.assertRaises(ValueError, msg='Non-existent reservation ID did not return ValueError from cancel_reservation.'):
+      rbs.cancel_reservation('rsv-00005')  
+    # check cancel single table reservation
+    rbs.cancel_reservation('rsv-00001')
+    self.assertNotIn('rsv-00001', rbs.reservations[5], 'Reservation ID rsv-00001 was not removed from table 5 reservations list when single table reservation canceled.')
+    self.assertNotIn('rsv-00001', rbs.reservation_lookup, 'Reservation ID rsv-00001 was not removed from reservation_lookup when reservation canceled.')
+    # check cancel combined tables reservation
+    rbs.cancel_reservation('rsv-00002')
+    self.assertNotIn('rsv-00002', rbs.reservations[7], 'Reservation ID rsv-00002 was not removed from primary table 7 reservations list when reservation canceled.')
+    self.assertNotIn('rsv-00002', rbs.reservations[1], 'Reservation ID rsv-00002 was not removed from linked table 1 reservations list when reservation canceled.')
+    self.assertNotIn('rsv-00002', rbs.reservations[3], 'Reservation ID rsv-00002 was not removed from linked table 3 reservations list when reservation canceled.')
+    self.assertNotIn('rsv-00002', rbs.reservation_lookup, 'Reservation ID rsv-00002 was not removed from reservation_lookup when combined table reservation canceled.')
+    # check that cancelations made no other modifications to reservations and reservation_lookup dicts
+    self.assertEqual(rbs.reservations, {1: [], 2: [], 3: [], 4: ['rsv-00003'], 5: [], 6: [], 7: []}, 'Canceling reservations incorrectly made other modifications to reservations dict.')
+    self.assertEqual(rbs.reservation_lookup, {'rsv-00003': {'name': 'Dave', 'reserved_time': '19:00 05-10-2026', 'num_diners': 4, 'vip_status': True, 'tables': [4]}}, 'Canceling reservations incorrectly made other modifications to reservation_lookup dict.')
+
+  # test assign_table_from_reservation
+  def test_assign_table_from_reservation(self):
+    # Create reservations to use for test - most will be assigned for the test and one will remain unassigned to check the reservations and reservation_lookup dicts after others are assigned
+    rbs.Reservation.reservation_count = 4
+    rbs.reservations[5] = ['rsv-00001']
+    rbs.reservation_lookup['rsv-00001'] = {'name': 'Mark', 'reserved_time': '19:00 05-7-2026', 'num_diners': 4, 'vip_status': False, 'tables': [5]}
+    rbs.reservations[1] = ['rsv-00002']
+    rbs.reservations[3] = ['rsv-00002']
+    rbs.reservations[7] = ['rsv-00002']
+    rbs.reservation_lookup['rsv-00002'] = {'name': 'John', 'reserved_time': '19:00 05-7-2026', 'num_diners': 14, 'vip_status': False, 'tables': [7, 1, 3]}
+    rbs.reservations[4] = ['rsv-00003', 'rsv-00004']
+    rbs.reservation_lookup['rsv-00003'] = {'name': 'Dave', 'reserved_time': '19:00 05-7-2026', 'num_diners': 4, 'vip_status': True, 'tables': [4]}    
+    rbs.reservation_lookup['rsv-00004'] = {'name': 'Lisa', 'reserved_time': '19:00 05-10-2026', 'num_diners': 4, 'vip_status': False, 'tables': [4]}   
+    # Test non-string reservation ID
+    with self.assertRaises(TypeError, msg='Non-string reservation ID did not raise a TypeError when assigning table from reservation.'):
+      rbs.assign_table_from_reservation('rsv-00001', 2)
+    # Test single reservation ID input
+    rbs.assign_table_from_reservation('rsv-00001')
+    # Check that internal assign_table call worked by confirming tables dict updated
+    self.assertEqual(rbs.tables[5], {'capacity': 4, 'status': 'occupied', 'name': 'Mark', 'vip_status': False, 'has_reservation': True, 'seating_time': '19:00 05-7-2026', 'num_diners': 4, 'order': {'ord_number': '00001'}, 'total': None, 'linked_tables': []}, 'Assigning table from reservation ID rsv-00001 did not correctly update tables dict.')
+    # Check that the reservation ID was removed from the table's reservations list and from the reservation_lookup dict on successful assignment
+    self.assertNotIn('rsv-00001', rbs.reservations[5], 'Assigning table from reservation did not remove reservation ID rsv-00001 from table 5 reservations list.')
+    self.assertNotIn('rsv-00001', rbs.reservation_lookup, 'Assigning table from reservation did not remove reservation ID rsv-00001 from reservation_lookup dict.')
+    # Test multiple reservation IDs input with one non-existent ID in the middle to confirm it gets skipped without raising error and the rest still process.
+    rbs.assign_table_from_reservation('rsv-00002', 'rsv-00005', 'rsv-00003')
+    # Confirm the first valid reservation ID table assignment worked by checking tables dict
+    # Check primary table
+    self.assertEqual(rbs.tables[7], {'capacity': 8, 'status': 'occupied', 'name': 'John', 'vip_status': False, 'has_reservation': True, 'seating_time': '19:00 05-7-2026', 'num_diners': 14, 'order': {'ord_number': '00002'}, 'total': None, 'linked_tables': [1, 3]}, 'With multiple reservation IDs input, assigning table from reservation ID rsv-00002 did not correctly update tables dict on primary table 7.')
+    # Check linked tables
+    self.assertEqual(rbs.tables[1], {'capacity': 2, 'status': 'occupied', 'linked_tables': [7, 3]}, 'With multiple reservation IDs input, assigning table from reservation ID rsv-00002 did not correctly update tables dict on linked table 1.')
+    self.assertEqual(rbs.tables[3], {'capacity': 4, 'status': 'occupied', 'linked_tables': [7, 1]}, 'With multiple reservation IDs input, assigning table from reservation ID rsv-00002 did not correctly update tables dict on linked table 3.')
+    # Check reservation ID removed from all three tables reservations lists and from reservation_lookup
+    self.assertNotIn('rsv-00002', rbs.reservations[7], 'With multiple reservation IDs input, assigning tables from reservation did not remove reservation ID rsv-00002 from primary table 7 reservations list.')
+    self.assertNotIn('rsv-00002', rbs.reservations[1], 'With multiple reservation IDs input, assigning tables from reservation did not remove reservation ID rsv-00002 from linked table 1 reservations list.')
+    self.assertNotIn('rsv-00002', rbs.reservations[3], 'With multiple reservation IDs input, assigning tables from reservation did not remove reservation ID rsv-00002 from linked table 3 reservations list.')
+    self.assertNotIn('rsv-00002', rbs.reservation_lookup, 'With multiple reservation IDs input, assigning tables from reservation did not remove reservation ID rsv-00002 from reservation_lookup dict.')
+    # Confirm non-existing ID skipped and remaining valid reservation ID table assignment worked
+    self.assertEqual(rbs.tables[4], {'capacity': 4, 'status': 'occupied', 'name': 'Dave', 'vip_status': True, 'has_reservation': True, 'seating_time': '19:00 05-7-2026', 'num_diners': 4, 'order': {'ord_number': '00003'}, 'total': None, 'linked_tables': []}, 'Following non-existent reservation ID, assigning table from reservation ID rsv-00003 did not correctly update tables dict.')
+    self.assertNotIn('rsv-00003', rbs.reservations[4], 'Following non-existent reservation ID, assigning table from reservation did not remove reservation ID rsv-00003 from table 4 reservations list.')
+    self.assertNotIn('rsv-00003', rbs.reservation_lookup, 'Following non-existent reservation ID, assigning table from reservation did not remove reservation ID rsv-00003 from reservation_lookup dict.')
+    # Check full values of tables, reservations, and reservation_lookup dicts to confirm no other values incorrectly added or modified
+    self.assertEqual(rbs.tables, {
+      1: {'capacity': 2, 'status': 'occupied', 'linked_tables': [7, 3]},
+      2: {'capacity': 2, 'status': 'available'},
+      3: {'capacity': 4, 'status': 'occupied', 'linked_tables': [7, 1]},
+      4: {'capacity': 4, 'status': 'occupied', 'name': 'Dave', 'vip_status': True, 'has_reservation': True, 'seating_time': '19:00 05-7-2026', 'num_diners': 4, 'order': {'ord_number': '00003'}, 'total': None, 'linked_tables': []},
+      5: {'capacity': 4, 'status': 'occupied', 'name': 'Mark', 'vip_status': False, 'has_reservation': True, 'seating_time': '19:00 05-7-2026', 'num_diners': 4, 'order': {'ord_number': '00001'}, 'total': None, 'linked_tables': []},
+      6: {'capacity': 6, 'status': 'available'},
+      7: {'capacity': 8, 'status': 'occupied', 'name': 'John', 'vip_status': False, 'has_reservation': True, 'seating_time': '19:00 05-7-2026', 'num_diners': 14, 'order': {'ord_number': '00002'}, 'total': None, 'linked_tables': [1, 3]}
+    }, 'Final tables dict does not match expected values after assign_table_from_reservation calls.')
+    self.assertEqual(rbs.reservations, {1: [], 2: [], 3: [], 4: ['rsv-00004'], 5: [], 6: [], 7: []}, 'Final reservations dict does not match expected values after assign_table_from_reservation calls.')
+    self.assertEqual(rbs.reservation_lookup, {'rsv-00004': {'name': 'Lisa', 'reserved_time': '19:00 05-10-2026', 'num_diners': 4, 'vip_status': False, 'tables': [4]}}, 'Final reservation_lookup dict does not match expected values after assign_table_from_reservation calls.')    
+
+  # test modify_reservation
+  def test_modify_reservation(self):
+    # Create dummy reservations to be modified - when checks require another reservation with some conflict, additional dummy reservations will be created for those specific checks
+    rbs.reservations[5] = ['rsv-00001']
+    rbs.reservation_lookup['rsv-00001'] = {'name': 'Mark', 'reserved_time': '19:00 05-12-2026', 'num_diners': 4, 'vip_status': False, 'tables': [5]}
+    rbs.reservations[1] = ['rsv-00002']
+    rbs.reservations[3] = ['rsv-00002']
+    rbs.reservations[7] = ['rsv-00002']
+    rbs.reservation_lookup['rsv-00002'] = {'name': 'John', 'reserved_time': '19:00 05-15-2026', 'num_diners': 14, 'vip_status': False, 'tables': [7, 1, 3]}
+    # Set reservation count based on the highest number used in the test
+    rbs.Reservation.reservation_count = 5
+    # Validate reservation_ID
+    # Check non-string reservation ID
+    with self.assertRaises(TypeError, msg='Non-string reservation ID passed to modify_reservation did not raise TypeError.'):
+      rbs.modify_reservation(1, new_time='19:00 05-13-2026')
+    # Check non-existent reservation ID
+    with self.assertRaises(ValueError, msg='Non-existent reservation ID passed to modify_reservation did not raise ValueError.'):
+      rbs.modify_reservation('rsv-00100', new_time='19:00 05-13-2026')
+    # Test no changes made, reservation ID is only argument passed
+    # Validate output message printed for the user - use patch() from unittest.mock to create a mock object of the sys.stdout created using StringIO to read the output text from the print()
+    with patch('sys.stdout', new_callable=StringIO) as mock_out:
+      rbs.modify_reservation('rsv-00001')
+    self.assertEqual(mock_out.getvalue(), 'No changes were made. Please provide at least one value to update.\n', 'modify_reservation call with no info being changed did not print output message.')
+    # Full dict equality checks to confirm nothing changed in reservations and reservation_lookup
+    self.assertEqual(rbs.reservations, {1: ['rsv-00002'], 2: [], 3: ['rsv-00002'], 4: [], 5: ['rsv-00001'], 6: [], 7: ['rsv-00002']}, 'Reservations dict incorrectly altered by modify_reservation when only reservation ID provided with no changes.')
+    self.assertEqual(rbs.reservation_lookup, {
+      'rsv-00001': {'name': 'Mark', 'reserved_time': '19:00 05-12-2026', 'num_diners': 4, 'vip_status': False, 'tables': [5]},
+      'rsv-00002': {'name': 'John', 'reserved_time': '19:00 05-15-2026', 'num_diners': 14, 'vip_status': False, 'tables': [7, 1, 3]} 
+      }, 'reservation_lookup dict incorrectly altered by modify_reservation when only reservation ID provided with no changes.')
+    # Test isolated changes to arguments with no conditional dependencies to other arguments
+    # Test new_name by itself
+    # Check blank name string
+    with self.assertRaises(ValueError, msg='Blank string for new_name in modify_reservation did not raise ValueError.'):
+      rbs.modify_reservation('rsv-00002', new_name='  ')
+    # Confirm updated ‘name’ in reservation_lookup with no other changes
+    rbs.modify_reservation('rsv-00002', new_name='John Smith')    
+    self.assertEqual(rbs.reservation_lookup['rsv-00002'], {'name': 'John Smith', 'reserved_time': '19:00 05-15-2026', 'num_diners': 14, 'vip_status': False, 'tables': [7, 1, 3]}, 'Full reservation info does not match expected values after modifying rsv-00002 with new name only.')
+    # Test new_vip_status by itself
+    rbs.modify_reservation('rsv-00001', new_vip_status=True)
+    # Check updated 'vip_status' in reservation_lookup with no other changes    
+    self.assertEqual(rbs.reservation_lookup['rsv-00001'], {'name': 'Mark', 'reserved_time': '19:00 05-12-2026', 'num_diners': 4, 'vip_status': True, 'tables': [5]}, 'Full reservation info does not match expected values after modifying rsv-00001 with new_vip_status only.')
+    # Test isolated changes to arguments with conditional dependencies
+    # Test new_table_numbers by itself
+    # Check non-list table numbers
+    with self.assertRaises(TypeError, msg='Non-list input for new_table_numbers in modify_reservation did not raise TypeError.'):
+      rbs.modify_reservation('rsv-00001', new_table_numbers=4)
+    # Confirm successful call of check_seating_capacity for new_table_numbers that cannot fit existing party size
+    with self.assertRaises(ValueError, msg='New table numbers that cannot fit existing party size did not raise ValueError on isolated change with modify_reservation.'):
+      rbs.modify_reservation('rsv-00002', new_table_numbers=[7, 1, 2])
+    # Create another dummy reservation for time conflict check
+    rbs.reservations[2] = ['rsv-00003']
+    rbs.reservation_lookup['rsv-00003'] = {'name': 'Lisa', 'reserved_time': '19:00 05-15-2026', 'num_diners': 2, 'vip_status': False, 'tables': [2]}
+    # Confirm successful call of check_time_conflict for new_table_numbers with a conflict against other reservation
+    with self.assertRaises(ValueError, msg='New table numbers with time conflict against other reservation did not raise ValueError on isolated change with modify_reservation.'):
+      rbs.modify_reservation('rsv-00002', new_table_numbers=[7, 2, 3])
+    # Check updated 'tables' in reservation_lookup with no other changes.
+    rbs.modify_reservation('rsv-00002', new_table_numbers=[4, 1, 3, 5])    
+    self.assertEqual(rbs.reservation_lookup['rsv-00002'], {'name': 'John Smith', 'reserved_time': '19:00 05-15-2026', 'num_diners': 14, 'vip_status': False, 'tables': [4, 1, 3, 5]}, 'Full reservation info does not match expected values after modifying rsv-00002 with new_table_numbers only.')
+    # Check reservation ID removed from old tables reservation lists and added to new tables reservation lists with no other changes   
+    self.assertEqual(rbs.reservations, {1: ['rsv-00002'], 2: ['rsv-00003'], 3: ['rsv-00002'], 4: ['rsv-00002'], 5: ['rsv-00001', 'rsv-00002'], 6: [], 7: []}, 'Reservations dict does not match expected values after modifying rsv-00002 with new_table_numbers only.')
+    # Test new_party_size
+    # Confirm successful call of check_seating_capacity for new_party_size greater than existing tables' capacity
+    with self.assertRaises(ValueError, msg='New party size larger than existing tables capacity did not raise ValueError on isolated change with modify_reservation.'):
+      rbs.modify_reservation('rsv-00001', new_party_size=6)
+    # Confirm updated 'num_diners' in reservation lookup with no other changes
+    rbs.modify_reservation('rsv-00001', new_party_size=3)    
+    self.assertEqual(rbs.reservation_lookup['rsv-00001'], {'name': 'Mark', 'reserved_time': '19:00 05-12-2026', 'num_diners': 3, 'vip_status': True, 'tables': [5]}, 'Full reservation info does not match expected values after modifying rsv-00001 with new_party_size only.')
+    # Test new_time    
+    # Create new dummy reservation for time conflict
+    rbs.reservations[5].append('rsv-00004')
+    rbs.reservation_lookup['rsv-00004'] = {'name': 'Dave', 'reserved_time': '17:45 05-12-2026', 'num_diners': 4, 'vip_status': False, 'tables': [5]}
+    # Confirm successful call of check_time_conflict for new_time with a conflict against other reservation
+    with self.assertRaises(ValueError, msg='New time with conflict against other reservation did not raise ValueError on isolated change with modify_reservation.'):
+      rbs.modify_reservation('rsv-00001', new_time='18:00 05-12-2026')
+    # Confirm updated 'reserve_time' in reservation_lookup with no other changes
+    rbs.modify_reservation('rsv-00001', new_time='20:00 05-12-2026')    
+    self.assertEqual(rbs.reservation_lookup['rsv-00001'], {'name': 'Mark', 'reserved_time': '20:00 05-12-2026', 'num_diners': 3, 'vip_status': True, 'tables': [5]}, 'Full reservation info does not match expected values after modifying rsv-00001 with new_time only.')
+    # Check combinations of arguments with conditional dependencies
+    # Combo 1: new_table_numbers + new_party_size
+    # Confirm successful call of check_seating_capacity for new party size too large for capacity of new table numbers
+    with self.assertRaises(ValueError, msg='New party size larger than new tables\' capacity did not raise ValueError on combo change with modify_reservation.'):
+      rbs.modify_reservation('rsv-00001', new_table_numbers=[4], new_party_size=6)
+    # Confirm updated 'tables' and 'num_diners' in reservation_lookup with no other changes
+    rbs.modify_reservation('rsv-00002', new_table_numbers=[4, 1, 6], new_party_size=12)
+    self.assertEqual(rbs.reservation_lookup['rsv-00002'], {'name': 'John Smith', 'reserved_time': '19:00 05-15-2026', 'num_diners': 12, 'vip_status': False, 'tables': [4, 1, 6]}, 'Full reservation info does not match expected values after modifying rsv-00002 with new_table_numbers and new_party_size.')
+    # Confirm reservation ID removed from old tables reservation lists and added to new tables reservation lists with no other changes
+    self.assertEqual(rbs.reservations, {1: ['rsv-00002'], 2: ['rsv-00003'], 3: [], 4: ['rsv-00002'], 5: ['rsv-00001', 'rsv-00004'], 6: ['rsv-00002'], 7: []}, 'Reservations dict does not match expected values after modifying rsv-00002 with new_table_numbers and new_party_size.')
+    # Combo 2: new_table_numbers + new_time
+    # Create another dummy reservation for time conflict check
+    rbs.reservations[3] =  ['rsv-00005']
+    rbs.reservation_lookup['rsv-00005'] = {'name': 'Marie Curie', 'reserved_time': '19:45 05-13-2026', 'num_diners': 4, 'vip_status': True, 'tables': [3]}
+    # Confirm successful call of check_time_conflict for new table numbers and new time with a conflict against other reservation
+    with self.assertRaises(ValueError, msg='New table number and new time with conflict against other reservation did not raise ValueError on combo change with modify_reservation.'):
+      rbs.modify_reservation('rsv-00001', new_table_numbers=[3], new_time='19:00 05-13-2026')
+    # Confirm updated 'tables' and 'reserved_time' in reservation_lookup with no other changes
+    rbs.modify_reservation('rsv-00001', new_table_numbers=[3], new_time='18:30 05-13-2026')
+    self.assertEqual(rbs.reservation_lookup['rsv-00001'], {'name': 'Mark', 'reserved_time': '18:30 05-13-2026', 'num_diners': 3, 'vip_status': True, 'tables': [3]}, 'Full reservation info does not match expected values after modifying rsv-00001 with new_table_numbers and new_time.')
+    # Confirm reservation ID removed from old table's reservation list and added to new table's reservation list with no other changes
+    self.assertEqual(rbs.reservations, {1: ['rsv-00002'], 2: ['rsv-00003'], 3: ['rsv-00005', 'rsv-00001'], 4: ['rsv-00002'], 5: [ 'rsv-00004'], 6: ['rsv-00002'], 7: []}, 'Reservations dict does not match expected values after modifying rsv-00001 with new_table_numbers and new_time.')
+    # Combo 3: all three at once new_table_numbers + new_party_size + new_time
+    # Confirm updated 'tables', 'num_diners', and 'reserved_time' in reservation_lookup with no other changes
+    rbs.modify_reservation('rsv-00002', new_table_numbers=[7, 2], new_party_size=10, new_time='20:00 05-15-2026')
+    self.assertEqual(rbs.reservation_lookup['rsv-00002'], {'name': 'John Smith', 'reserved_time': '20:00 05-15-2026', 'num_diners': 10, 'vip_status': False, 'tables': [7, 2]}, 'Full reservation info does not match expected values after modifying rsv-00002 with new_table_numbers, new_party_size, and new_time.')
+    # Confirm reservation ID removed from old tables' reservation lists and added to new tables' reservation lists
+    self.assertEqual(rbs.reservations, {1: [], 2: ['rsv-00003', 'rsv-00002'], 3: ['rsv-00005', 'rsv-00001'], 4: [], 5: ['rsv-00004'], 6: [], 7: ['rsv-00002']}, 'Reservations dict does not match expected values after modifying rsv-00002 with new_table_numbers, new_party_size, and new_time.')
+    # Test change to all arguments simultaneously
+    rbs.modify_reservation('rsv-00001', new_name='Mark Wise', new_table_numbers=[4], new_party_size=4, new_time='19:00 05-14-2026', new_vip_status=False)
+    # Confirm all keys correctly updated in reservation_lookup
+    self.assertEqual(rbs.reservation_lookup['rsv-00001'], {'name': 'Mark Wise', 'reserved_time': '19:00 05-14-2026', 'num_diners': 4, 'vip_status': False, 'tables': [4]}, 'Full reservation info does not match expected values after modifying rsv-00001 with all arguments.')
+    # Full dict equality check for reservations
+    self.assertEqual(rbs.reservations, {1: [], 2: ['rsv-00003', 'rsv-00002'], 3: ['rsv-00005'], 4: ['rsv-00001'], 5: ['rsv-00004'], 6: [], 7: ['rsv-00002']}, 'Full reservations dict does not match expected values after all reservation modifications.')
+    # Full dict equality check for reservation_lookup
+    self.assertEqual(rbs.reservation_lookup, {
+      'rsv-00001': {'name': 'Mark Wise', 'reserved_time': '19:00 05-14-2026', 'num_diners': 4, 'vip_status': False, 'tables': [4]},
+      'rsv-00002': {'name': 'John Smith', 'reserved_time': '20:00 05-15-2026', 'num_diners': 10, 'vip_status': False, 'tables': [7, 2]},
+      'rsv-00003': {'name': 'Lisa', 'reserved_time': '19:00 05-15-2026', 'num_diners': 2, 'vip_status': False, 'tables': [2]},
+      'rsv-00004': {'name': 'Dave', 'reserved_time': '17:45 05-12-2026', 'num_diners': 4, 'vip_status': False, 'tables': [5]},
+      'rsv-00005': {'name': 'Marie Curie', 'reserved_time': '19:45 05-13-2026', 'num_diners': 4, 'vip_status': True, 'tables': [3]}
+    }, 'Final reservation_lookup dict does not match expected values after all modifications.')
+
+  # Test add_order_items function
+  def test_add_order_items(self):
+    # Create dummy table assignments and orders - one with no current order items and one with existing items already added
+    rbs.Order.order_count = 2
+    rbs.tables[1] = {'capacity': 2, 'status': 'occupied', 'name': 'Customer', 'vip_status': False, 'has_reservation': False, 'seating_time': '14:30 05-11-2026', 'num_diners': 2, 'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sprite']}, 'total': None, 'linked_tables': []}
+    rbs.tables[3] = {'capacity': 4, 'status': 'occupied', 'name': 'Customer', 'vip_status': False, 'has_reservation': False, 'seating_time': '15:00 05-11-2026', 'num_diners': 4, 'order': {'ord_number': '00002'}, 'total': None, 'linked_tables': []}
+    # Check table number that has no order
+    with self.assertRaises(LookupError, msg='Table number with no order did not raise LookupError when adding order items.'):
+      rbs.add_order_items(5, food=['Spaghetti'], drinks=['Sparkling Water'])
+    # Check non-list values for food and drinks
+    with self.assertRaises(TypeError, msg='Non-list value for food did not raise TypeError when adding order items.'):
+      rbs.add_order_items(1, food='Spaghetti', drinks=['Sparkling Water'])
+    with self.assertRaises(TypeError, msg='Non-list value for drinks did not raise TypeError when adding order items.'):
+      rbs.add_order_items(1, food=['Spaghetti'], drinks='Sparkling Water')
+    # Check non-string food name in food list
+    with self.assertRaises(TypeError, msg='Non-string value in food list did not raise TypeError when adding order items.'):
+      rbs.add_order_items(1, food=[('Spaghetti',)])
+    # Check food not on the menu
+    with self.assertRaises(LookupError, msg='Non-existent food item did not raise LookupError when adding order items.'):
+      rbs.add_order_items(1, food=['French Toast'])
+    # Check non-string drink name in drinks list
+    with self.assertRaises(TypeError, msg='Non-string value in drinks list did not raise TypeError when adding order items.'):
+      rbs.add_order_items(1, drinks=[('Sparkling Water',)])
+    # Check drink not on the menu
+    with self.assertRaises(LookupError, msg='Non-existent drink item did not raise LookupError when adding order items.'):
+      rbs.add_order_items(1, drinks=['Root Beer'])
+    # Add items to an empty order
+    rbs.add_order_items(3, food=['Spaghetti', 'Ham Sandwich', 'Salad', 'Chicken Fingers'], drinks=['Sparkling Water', 'Sparkling Water', 'Sprite', 'Grape Soda'])
+    # Confirm updated order in the table's dict with no other changes
+    self.assertEqual(rbs.tables[3], {
+      'capacity': 4, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '15:00 05-11-2026', 
+      'num_diners': 4, 
+      'order': {'ord_number': '00002', 'food_items': ['Spaghetti', 'Ham Sandwich', 'Salad', 'Chicken Fingers'], 'drinks':['Sparkling Water', 'Sparkling Water', 'Sprite', 'Grape Soda']}, 
+      'total': None, 
+      'linked_tables': []},
+      'Table 3 dictionary does not match expected values after adding items to empty order.')
+    # Add additional items to an order with pre-existing foods and drinks
+    rbs.add_order_items(1, food=['French Fries', 'Ice Cream'], drinks=['Sparkling Water'])
+    # Confirm updated order in the table's dict with no other changes
+    self.assertEqual(rbs.tables[1], {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '14:30 05-11-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich', 'French Fries', 'Ice Cream'], 'drinks': ['Coca Cola', 'Sprite', 'Sparkling Water']}, 
+      'total': None, 
+      'linked_tables': []},
+      'Table 1 dictionary does not match expected values after adding items to order with pre-existing foods and drinks.')
+    # Full equality check of the tables dict to confirm no other tables modified incorrectly
+    self.assertEqual(rbs.tables,{
+       1: {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '14:30 05-11-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich', 'French Fries', 'Ice Cream'], 'drinks': ['Coca Cola', 'Sprite', 'Sparkling Water']}, 
+      'total': None, 
+      'linked_tables': []},
+       2: {'capacity': 2, 'status': 'available'},
+       3: {
+      'capacity': 4, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '15:00 05-11-2026', 
+      'num_diners': 4, 
+      'order': {'ord_number': '00002', 'food_items': ['Spaghetti', 'Ham Sandwich', 'Salad', 'Chicken Fingers'], 'drinks':['Sparkling Water', 'Sparkling Water', 'Sprite', 'Grape Soda']}, 
+      'total': None, 
+      'linked_tables': []},
+       4: {'capacity': 4, 'status': 'available'},
+       5: {'capacity': 4, 'status': 'available'},
+       6: {'capacity': 6, 'status': 'available'},
+       7: {'capacity': 8, 'status': 'available'}
+    }, 'Final tables dict does not match expected values after all order items added.')
   
+  # Test remove_order_items function
+  def test_remove_order_items(self):
+    # Create dummy table assignments and orders - one with no current order items and one with existing items already added
+    rbs.Order.order_count = 2
+    rbs.tables[1] = {'capacity': 2, 'status': 'occupied', 'name': 'Customer', 'vip_status': False, 'has_reservation': False, 'seating_time': '14:30 05-11-2026', 'num_diners': 2, 'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich', 'French Fries', 'Ice Cream'], 'drinks': ['Coca Cola', 'Sprite', 'Sparkling Water']}, 'total': None, 'linked_tables': []}
+    rbs.tables[3] = {'capacity': 4, 'status': 'occupied', 'name': 'Customer', 'vip_status': False, 'has_reservation': False, 'seating_time': '15:00 05-11-2026', 'num_diners': 4, 'order': {'ord_number': '00002'}, 'total': None, 'linked_tables': []}
+    # Check table number that has no order
+    with self.assertRaises(LookupError, msg='Table number with no order did not raise LookupError when removing order items.'):
+      rbs.remove_order_items(5, food=['Spaghetti'], drinks=['Sparkling Water'])
+    # Check removing food from order that has no foods to remove
+    with self.assertRaises(LookupError, msg='Table number with no foods on the order did not raise LookupError when removing food items.'):
+      rbs.remove_order_items(3, food=['Spaghetti'])
+    # Check removing drink from order that has no drinks to remove
+    with self.assertRaises(LookupError, msg='Table number with no drinks on the order did not raise LookupError when removing drink items.'):
+      rbs.remove_order_items(3, drinks=['Sparkling Water'])
+    # Check non-list values for food and drinks
+    with self.assertRaises(TypeError, msg='Non-list value for food did not raise TypeError when removing order items.'):
+      rbs.remove_order_items(1, food='Ice Cream', drinks=['Sparkling Water'])
+    with self.assertRaises(TypeError, msg='Non-list value for drinks did not raise TypeError when removing order items.'):
+      rbs.remove_order_items(1, food=['Ice Cream'], drinks='Sparkling Water')
+    # Check non-string food name in food list
+    with self.assertRaises(TypeError, msg='Non-string value in food list did not raise TypeError when removing order items.'):
+      rbs.remove_order_items(1, food=[('Ice Cream',)])
+    # Check non-string drink name in drinks list
+    with self.assertRaises(TypeError, msg='Non-string value in drinks list did not raise TypeError when removing order items.'):
+      rbs.remove_order_items(1, drinks=[('Sparkling Water',)])
+    # Remove items from order and include some items that are not part of the order to confirm they are skipped cleanly without raising an error and the remaining items are removed
+    rbs.remove_order_items(1, food=['French Fries', 'Spaghetti', 'Ice Cream'], drinks=['Grape Soda', 'Sparkling Water'])
+    # Confirm updated order in the table's dict with no other changes
+    self.assertEqual(rbs.tables[1], {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '14:30 05-11-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sprite']}, 
+      'total': None, 
+      'linked_tables': []},
+      'Table 1 dictionary does not match expected values after removing order items.')
+    # Validate output message printed for the user when food or drink item not in the order gets skipped
+    with patch('sys.stdout', new_callable=StringIO) as mock_out:
+      rbs.remove_order_items(1, food=['Spaghetti'])
+    self.assertIn('Cannot remove food ', mock_out.getvalue(), 'Removing food not on the order did not print output message.')
+    with patch('sys.stdout', new_callable=StringIO) as mock_out:
+      rbs.remove_order_items(1, drinks=['Grape Soda'])
+    self.assertIn('Cannot remove drink ', mock_out.getvalue(), 'Removing drink not on the order did not print output message.')
+    # Full equality check of the tables dict to confirm no other updates made incorrectly
+    self.assertEqual(rbs.tables,{
+       1: {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '14:30 05-11-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sprite']}, 
+      'total': None, 
+      'linked_tables': []},
+       2: {'capacity': 2, 'status': 'available'},
+       3: {
+      'capacity': 4, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '15:00 05-11-2026', 
+      'num_diners': 4, 
+      'order': {'ord_number': '00002'}, 
+      'total': None, 
+      'linked_tables': []},
+       4: {'capacity': 4, 'status': 'available'},
+       5: {'capacity': 4, 'status': 'available'},
+       6: {'capacity': 6, 'status': 'available'},
+       7: {'capacity': 8, 'status': 'available'}
+    }, 'Final tables dict does not match expected values after all order items removed.')    
+          
   # tear down test fixture by wiping slate clean again and saving to the JSON to keep the file clear of any table assignments and reservations created and saved to the file by the tests
   def tearDown(self):
     rbs.tables.clear()
