@@ -270,30 +270,42 @@ def remove_order_items(table_number, **removed_items):
   validate_params(table_number=table_number)
   # Validate order items provided in list form.
   if not all(isinstance(v, list) for v in removed_items.values()):
-    raise TypeError("All items to remove must be provided in separate lists for food and drinks.")  
+    raise TypeError("All items to remove must be provided in separate lists for food and drinks.")
+  # assign the table's order info from the tables dict to a reference variable for improved readability on subsequent calls
+  try:
+    order = tables[table_number]['order']
+  # Raise an error if no order found for the given table
+  except LookupError:
+    raise LookupError(f"No order found for table {table_number}.")  
   # Check if there is food in the removed items. If yes, assign the 'food' argument to a variable called 'remove_foods'.
   if 'food' in removed_items:
+    # Check that the order has food items to remove
+    if 'food_items' not in order:
+      raise LookupError(f"Table {table_number}\'s order has no existing food items to remove.")
     remove_foods = removed_items.get('food')
     # Check that all items in the removed foods list are strings. Return ValueError if not, otherwise remove foods from the order in the tables dictionary.
     if not all(isinstance(item, str) for item in remove_foods):
       raise TypeError("All food items must be strings.")
     else:
       for food in remove_foods:
-        if food not in tables[table_number]['order']['food_items']:
+        if food not in order['food_items']:
           print(f"Cannot remove food {food} because it is not in the order.")
         else:
-          tables[table_number]['order']['food_items'].remove(food)
+          order['food_items'].remove(food)
   # Repeat the same for drinks.
-  if 'drinks' in removed_items:  
+  if 'drinks' in removed_items:
+    # Check that the order has drinks to remove
+    if 'drinks' not in order:
+      raise LookupError(f"Table {table_number}\'s order has no existing drinks to remove.")  
     remove_drinks = removed_items.get('drinks')  
     if not all(isinstance(item, str) for item in remove_drinks):
       raise TypeError("All drinks must be strings.")   
     else:
       for drink in remove_drinks:
-        if drink not in tables[table_number]['order']['drinks']:
+        if drink not in order['drinks']:
           print(f"Cannot remove drink {drink} because it is not in the order.")
         else:
-          tables[table_number]['order']['drinks'].remove(drink)
+          order['drinks'].remove(drink)
   save_data()
 
 # Function that will take in the table number and an operation - either 'add' or 'print' - to iterate through items in the table's order and either sum the prices to get the total or print them all with formatting for the bill.
