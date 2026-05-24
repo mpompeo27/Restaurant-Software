@@ -342,6 +342,9 @@ def calc_total(table_number):
   # Validate table number.
   validate_params(table_number=table_number)
   # Check that the table has any order at all.
+  if 'order' not in tables[table_number]:
+    raise LookupError(f"Table {table_number} has no order attached.")
+  # Check that the table's order has items.
   if not any(key in tables[table_number]['order'] for key in ('food_items', 'drinks')):
     raise LookupError(f"Table {table_number} has no order items to calculate the total.")
   # Get total using iterate_items with the 'add' op.
