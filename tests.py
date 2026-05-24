@@ -915,7 +915,285 @@ class RestaurantFunctionTests(unittest.TestCase):
        5: {'capacity': 4, 'status': 'available'},
        6: {'capacity': 6, 'status': 'available'},
        7: {'capacity': 8, 'status': 'available'}
-    }, 'Final tables dict does not match expected values after all order items removed.')    
+    }, 'Final tables dict does not match expected values after all order items removed.')
+
+  # test iterate_items
+  def test_iterate_items(self):
+    # Create table assignment with order for testing
+    rbs.Order.order_count = 1
+    rbs.tables[1] = {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '17:30 05-23-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sparkling Water']}, 
+      'total': None, 
+      'linked_tables': []}
+    # Note the correct total for this order should be 3.5 + 5.0 + 2.0 + 1.75 = 12.25 or $12.25
+    # Check correct total returned with the 'add' operation
+    self.assertEqual(rbs.iterate_items(1, 'add'), 12.25, 'iterate_items add operation did not return correct total.')
+    # Check correct item name and price printing with the 'print' operation
+    with patch('sys.stdout', new_callable=StringIO) as mock_out:
+      rbs.iterate_items(1, 'print')
+    self.assertIn('Tuna Sandwich', mock_out.getvalue(), 'iterate_items print operation did not correctly print first food item name.')
+    self.assertIn('3.50', mock_out.getvalue(), 'iterate_items print operation did not correctly print first food item price.')
+    self.assertIn('Turkey Club Sandwich', mock_out.getvalue(), 'iterate_items print operation did not correctly print second food item name.')
+    self.assertIn('5.00', mock_out.getvalue(), 'iterate_items print operation did not correctly print second food item price.')
+    self.assertIn('Coca Cola', mock_out.getvalue(), 'iterate_items print operation did not correctly print first drink item name.')
+    self.assertIn('2.00', mock_out.getvalue(), 'iterate_items print operation did not correctly print first drink item price.')
+    self.assertIn('Sparkling Water', mock_out.getvalue(), 'iterate_items print operation did not correctly print second drink item name.')
+    self.assertIn('1.75', mock_out.getvalue(), 'iterate_items print operation did not correctly print second drink item price.')
+
+  # test calc_total
+  def test_calc_total(self):
+    # Create table assignment with order and items
+    rbs.Order.order_count = 2
+    rbs.tables[1] = {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '17:30 05-23-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sparkling Water']}, 
+      'total': None, 
+      'linked_tables': []}
+    # Note the correct total for this order should be 3.5 + 5.0 + 2.0 + 1.75 = 12.25 or $12.25
+    # Create table assignment with an order but no items added
+    rbs.tables[3] = {
+      'capacity': 4, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '17:45 05-23-2026', 
+      'num_diners': 4, 
+      'order': {'ord_number': '00002'}, 
+      'total': None, 
+      'linked_tables': []}
+    # Check non-exist
+    # Confirm error returned for table number with no order
+    with self.assertRaises(LookupError, msg='calc_total did not raise LookupError for table number with no order.'):
+      rbs.calc_total(4)
+    # Confirm error returned for table number whose order has no items
+    with self.assertRaises(LookupError, msg='calc_total did not raise LookupError for table number whose order has no items.'):
+      rbs.calc_total(3)
+    # Run calc_total on the order and set equal to a variable
+    test_total = rbs.calc_total(1)
+    # Confirm correct total returned
+    self.assertEqual(test_total, Decimal('12.25'), 'calc_total did not return correct total.')
+    # Confirm value of 'total' key correctly updated in the table's dict
+    self.assertEqual(rbs.tables[1]['total'], '$12.25', 'Table 1 total not correctly updated in tables dict with value from calc_total.')
+    # Full tables dict equality check to confirm nothing else updated in error
+    self.assertEqual(rbs.tables, {
+    1: {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '17:30 05-23-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sparkling Water']}, 
+      'total': '$12.25', 
+      'linked_tables': []},
+    2: {
+      'capacity': 2, 
+      'status': 'available'},
+    3: {
+      'capacity': 4, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '17:45 05-23-2026', 
+      'num_diners': 4, 
+      'order': {'ord_number': '00002'}, 
+      'total': None, 
+      'linked_tables': []},
+    4: {
+      'capacity': 4, 
+      'status': 'available'},
+    5: {
+      'capacity': 4, 
+      'status': 'available'},
+    6: {
+      'capacity': 6, 
+      'status': 'available'},
+    7: {
+      'capacity': 8, 
+      'status': 'available'}
+    }, 'Full tables dict does not match expected values after running calc_total.')
+
+  # test print_bill for single payor
+  def test_print_bill_single(self):
+    pass
+
+  # test print_bill with a split
+  def test_print_bill_split(self):
+    pass
+
+  def test_clear_tables(self):
+    rbs.Order.order_count = 5
+    rbs.tables = {
+       1: {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '14:30 05-22-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sprite']}, 
+      'total': None, 
+      'linked_tables': []},
+       2: {
+      'capacity': 2, 
+      'status': 'occupied',
+      'name': 'Joe Thomas', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '15:30 05-22-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00005', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sprite']}, 
+      'total': None, 
+      'linked_tables': []},
+       3: {
+      'capacity': 4, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '15:00 05-22-2026', 
+      'num_diners': 4, 
+      'order': {'ord_number': '00002'}, 
+      'total': None, 
+      'linked_tables': []},
+       4: {
+      'capacity': 4, 
+      'status': 'occupied',
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '15:20 05-22-2026', 
+      'num_diners': 3, 
+      'order': {'ord_number': '00004', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich', 'Chicken Fingers'], 'drinks': ['Coca Cola', 'Sprite', 'Apple Juice']}, 
+      'total': None, 
+      'linked_tables': []},
+       5: {
+      'capacity': 4, 
+      'status': 'occupied',
+      'name': 'Roger', 
+      'vip_status': False, 
+      'has_reservation': True, 
+      'seating_time': '15:00 05-22-2026', 
+      'num_diners': 18, 
+      'order': {'ord_number': '00003'}, 
+      'total': None, 
+      'linked_tables': [6, 7]},
+       6: {'capacity': 6, 'status': 'occupied', 'linked_tables': [5, 7]},
+       7: {'capacity': 8, 'status': 'occupied', 'linked_tables': [5, 6]}
+    }
+    # Check non-integer table number input
+    with self.assertRaises(TypeError, msg='Non-integer table number did not raise TypeError when clearing tables.'):
+      rbs.clear_tables('one', 3)
+    # Check non-existent table number prints message and skips without error and remaining table(s) cleared with message printed
+    with patch('sys.stdout', new_callable=StringIO) as mock_out:
+      rbs.clear_tables(10, 3)
+    self.assertIn('There is no table number 10', mock_out.getvalue(), 'Non-existent table number did not print message correctly when clearing tables.')
+    self.assertEqual(rbs.tables[3], {'capacity': 4, 'status': 'available'}, 'Non-existent table number in clear_tables did not skip and clear remaining table.')
+    self.assertIn('Table number 3 has been cleared', mock_out.getvalue(), 'Table cleared after non-existent table skipped did not print message.')
+    # Check already empty table number prints message and skips without error and remaining table(s) cleared with message printed
+    with patch('sys.stdout', new_callable=StringIO) as mock_out:
+      rbs.clear_tables(3, 1)
+    self.assertIn('Table number 3 is already empty', mock_out.getvalue(), 'Already empty table number did not print message correctly when clearing tables.')    
+    self.assertEqual(rbs.tables[1], {'capacity': 2, 'status': 'available'}, 'Already empty table number in clear_tables did not skip and clear remaining table.')
+    self.assertIn('Table number 1 has been cleared', mock_out.getvalue(), 'Table cleared after empty table skipped did not print message.')
+    # Confirm successful clear of multiple non-linked tables
+    rbs.clear_tables(2, 4)
+    self.assertEqual(rbs.tables[2], {'capacity': 2, 'status': 'available'}, 'First table number not cleared correctly when clearing two non-linked tables.')
+    self.assertEqual(rbs.tables[4], {'capacity': 4, 'status': 'available'}, 'Second table not cleared correctly when clearing two non-linked tables.')
+    # Check full state of tables dict after all non-linked tables cleared
+    self.assertEqual(rbs.tables, {
+      1: {'capacity': 2, 'status': 'available'},
+      2: {'capacity': 2, 'status': 'available'},
+      3: {'capacity': 4, 'status': 'available'},
+      4: {'capacity': 4, 'status': 'available'},
+      5: {
+      'capacity': 4, 
+      'status': 'occupied',
+      'name': 'Roger', 
+      'vip_status': False, 
+      'has_reservation': True, 
+      'seating_time': '15:00 05-22-2026', 
+      'num_diners': 18, 
+      'order': {'ord_number': '00003'}, 
+      'total': None, 
+      'linked_tables': [6, 7]},
+      6: {'capacity': 6, 'status': 'occupied', 'linked_tables': [5, 7]},
+      7: {'capacity': 8, 'status': 'occupied', 'linked_tables': [5, 6]}
+      }, 'Full tables dict does not match expected values after non-linked tables cleared.')
+    # Confirm linked tables successfully cleared from primary table number and message printed for each table.
+    with patch('sys.stdout', new_callable=StringIO) as mock_out:
+      rbs.clear_tables(5)
+    self.assertEqual(rbs.tables[5], {'capacity': 4, 'status': 'available'}, 'Primary table number 5 not cleared correctly when clearing linked tables from primary table number.')
+    self.assertIn('Table number 5 has been cleared', mock_out.getvalue(), 'First table cleared did not print message when clearing linked tables.')
+    self.assertEqual(rbs.tables[6], {'capacity': 6, 'status': 'available'}, 'Linked table number 6 not cleared correctly when clearing linked tables from primary table number.')
+    self.assertIn('Linked table 6 has been cleared', mock_out.getvalue(), 'First linked table did not print message when clearing linked tables.')
+    self.assertEqual(rbs.tables[7], {'capacity': 8, 'status': 'available'}, 'Linked table number 7 not cleared correctly when clearing linked tables.')
+    self.assertIn('Linked table 7 has been cleared', mock_out.getvalue(), 'Second linked table did not print message when clearing linked tables from primary table number.')
+    # Check full tables dict and confirm all tables cleared and available
+    self.assertEqual(rbs.tables, {
+      1: {'capacity': 2, 'status': 'available'},
+      2: {'capacity': 2, 'status': 'available'},
+      3: {'capacity': 4, 'status': 'available'},
+      4: {'capacity': 4, 'status': 'available'},
+      5: {'capacity': 4, 'status': 'available'},
+      6: {'capacity': 6, 'status': 'available'},
+      7: {'capacity': 8, 'status': 'available'}
+    }, 'Full table dict does not match expected values after all tables cleared.')
+    # Create new mock table assignments for more linked tables
+    rbs.Order.order_count = 6
+    rbs.tables = {
+       1: {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Mark', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '15:45 05-22-2026', 
+      'num_diners': 6, 
+      'order': {'ord_number': '00006', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sprite']}, 
+      'total': None, 
+      'linked_tables': [3]},
+       2: {'capacity': 2, 'status': 'available'},
+       3: {
+      'capacity': 4, 
+      'status': 'occupied',      
+      'linked_tables': [1]},
+       4: {'capacity': 4, 'status': 'available'},
+       5: {'capacity': 4, 'status': 'available'},
+       6: {'capacity': 6, 'status': 'available'},
+       7: {'capacity': 8, 'status': 'available'}
+    }
+    # Confirm linked table numbers successfully cleared from just linked table number.
+    rbs.clear_tables(3)
+    self.assertEqual(rbs.tables[1], {'capacity': 2, 'status': 'available'}, 'Primary table 1 not cleared correctly when clearing linked tables from a linked table number.')
+    self.assertEqual(rbs.tables[3], {'capacity': 4, 'status': 'available'}, 'Linked table 3 not cleared correctly when clearing linked tables from a linked table number.')
+    # Final full tables dict equality check
+    self.assertEqual(rbs.tables, {
+      1: {'capacity': 2, 'status': 'available'},
+      2: {'capacity': 2, 'status': 'available'},
+      3: {'capacity': 4, 'status': 'available'},
+      4: {'capacity': 4, 'status': 'available'},
+      5: {'capacity': 4, 'status': 'available'},
+      6: {'capacity': 6, 'status': 'available'},
+      7: {'capacity': 8, 'status': 'available'}
+    }, 'Full table dict does not match expected values after clearing linked tables using linked table number.') 
           
   # tear down test fixture by wiping slate clean again and saving to the JSON to keep the file clear of any table assignments and reservations created and saved to the file by the tests
   def tearDown(self):
