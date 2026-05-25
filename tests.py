@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 import json, os
 from unittest.mock import patch
 from io import StringIO
+from decimal import Decimal, ROUND_HALF_UP
 
 # Create unit testing class
 class RestaurantFunctionTests(unittest.TestCase):
@@ -777,7 +778,7 @@ class RestaurantFunctionTests(unittest.TestCase):
     # Check drink not on the menu
     with self.assertRaises(LookupError, msg='Non-existent drink item did not raise LookupError when adding order items.'):
       rbs.add_order_items(1, drinks=['Root Beer'])
-    # Add items to an empty order
+    # Add food and drink items to an empty order
     rbs.add_order_items(3, food=['Spaghetti', 'Ham Sandwich', 'Salad', 'Chicken Fingers'], drinks=['Sparkling Water', 'Sparkling Water', 'Sprite', 'Grape Soda'])
     # Confirm updated order in the table's dict with no other changes
     self.assertEqual(rbs.tables[3], {
@@ -791,7 +792,7 @@ class RestaurantFunctionTests(unittest.TestCase):
       'order': {'ord_number': '00002', 'food_items': ['Spaghetti', 'Ham Sandwich', 'Salad', 'Chicken Fingers'], 'drinks':['Sparkling Water', 'Sparkling Water', 'Sprite', 'Grape Soda']}, 
       'total': None, 
       'linked_tables': []},
-      'Table 3 dictionary does not match expected values after adding items to empty order.')
+      'Table 3 dictionary does not match expected values after adding food and drink items to empty order.')
     # Add additional items to an order with pre-existing foods and drinks
     rbs.add_order_items(1, food=['French Fries', 'Ice Cream'], drinks=['Sparkling Water'])
     # Confirm updated order in the table's dict with no other changes
@@ -807,6 +808,34 @@ class RestaurantFunctionTests(unittest.TestCase):
       'total': None, 
       'linked_tables': []},
       'Table 1 dictionary does not match expected values after adding items to order with pre-existing foods and drinks.')
+    # Check adding foods only
+    rbs.add_order_items(3, food=['French Fries'])
+    self.assertEqual(rbs.tables[3], {
+      'capacity': 4, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '15:00 05-11-2026', 
+      'num_diners': 4, 
+      'order': {'ord_number': '00002', 'food_items': ['Spaghetti', 'Ham Sandwich', 'Salad', 'Chicken Fingers', 'French Fries'], 'drinks':['Sparkling Water', 'Sparkling Water', 'Sprite', 'Grape Soda']}, 
+      'total': None, 
+      'linked_tables': []},
+      'Table 3 dictionary does not match expected values after adding food only to order.')
+    # Check adding drinks only
+    rbs.add_order_items(3, drinks=['Beer'])    
+    self.assertEqual(rbs.tables[3], {
+      'capacity': 4, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '15:00 05-11-2026', 
+      'num_diners': 4, 
+      'order': {'ord_number': '00002', 'food_items': ['Spaghetti', 'Ham Sandwich', 'Salad', 'Chicken Fingers', 'French Fries'], 'drinks':['Sparkling Water', 'Sparkling Water', 'Sprite', 'Grape Soda', 'Beer']}, 
+      'total': None, 
+      'linked_tables': []},
+      'Table 3 dictionary does not match expected values after adding drink only to order.')
     # Full equality check of the tables dict to confirm no other tables modified incorrectly
     self.assertEqual(rbs.tables,{
        1: {
@@ -829,7 +858,7 @@ class RestaurantFunctionTests(unittest.TestCase):
       'has_reservation': False, 
       'seating_time': '15:00 05-11-2026', 
       'num_diners': 4, 
-      'order': {'ord_number': '00002', 'food_items': ['Spaghetti', 'Ham Sandwich', 'Salad', 'Chicken Fingers'], 'drinks':['Sparkling Water', 'Sparkling Water', 'Sprite', 'Grape Soda']}, 
+      'order': {'ord_number': '00002', 'food_items': ['Spaghetti', 'Ham Sandwich', 'Salad', 'Chicken Fingers', 'French Fries'], 'drinks':['Sparkling Water', 'Sparkling Water', 'Sprite', 'Grape Soda', 'Beer']}, 
       'total': None, 
       'linked_tables': []},
        4: {'capacity': 4, 'status': 'available'},
@@ -864,7 +893,7 @@ class RestaurantFunctionTests(unittest.TestCase):
     # Check non-string drink name in drinks list
     with self.assertRaises(TypeError, msg='Non-string value in drinks list did not raise TypeError when removing order items.'):
       rbs.remove_order_items(1, drinks=[('Sparkling Water',)])
-    # Remove items from order and include some items that are not part of the order to confirm they are skipped cleanly without raising an error and the remaining items are removed
+    # Remove food and drink items from order, including some items that are not part of the order to confirm they are skipped cleanly without raising an error and the remaining items are removed
     rbs.remove_order_items(1, food=['French Fries', 'Spaghetti', 'Ice Cream'], drinks=['Grape Soda', 'Sparkling Water'])
     # Confirm updated order in the table's dict with no other changes
     self.assertEqual(rbs.tables[1], {
@@ -878,7 +907,7 @@ class RestaurantFunctionTests(unittest.TestCase):
       'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sprite']}, 
       'total': None, 
       'linked_tables': []},
-      'Table 1 dictionary does not match expected values after removing order items.')
+      'Table 1 dictionary does not match expected values after removing food and drink items.')
     # Validate output message printed for the user when food or drink item not in the order gets skipped
     with patch('sys.stdout', new_callable=StringIO) as mock_out:
       rbs.remove_order_items(1, food=['Spaghetti'])
@@ -886,6 +915,34 @@ class RestaurantFunctionTests(unittest.TestCase):
     with patch('sys.stdout', new_callable=StringIO) as mock_out:
       rbs.remove_order_items(1, drinks=['Grape Soda'])
     self.assertIn('Cannot remove drink ', mock_out.getvalue(), 'Removing drink not on the order did not print output message.')
+    # Remove food only and check table's dict
+    rbs.remove_order_items(1, food=['Tuna Sandwich'])
+    self.assertEqual(rbs.tables[1], {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '14:30 05-11-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sprite']}, 
+      'total': None, 
+      'linked_tables': []},
+      'Table 1 dictionary does not match expected values after removing food and drink items.')
+    # Remove drinks only and check table's dict
+    rbs.remove_order_items(1, drinks=['Sprite'])
+    self.assertEqual(rbs.tables[1], {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '14:30 05-11-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Turkey Club Sandwich'], 'drinks': ['Coca Cola']}, 
+      'total': None, 
+      'linked_tables': []},
+      'Table 1 dictionary does not match expected values after removing food and drink items.')
     # Full equality check of the tables dict to confirm no other updates made incorrectly
     self.assertEqual(rbs.tables,{
        1: {
@@ -896,7 +953,7 @@ class RestaurantFunctionTests(unittest.TestCase):
       'has_reservation': False, 
       'seating_time': '14:30 05-11-2026', 
       'num_diners': 2, 
-      'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sprite']}, 
+      'order': {'ord_number': '00001', 'food_items': ['Turkey Club Sandwich'], 'drinks': ['Coca Cola']}, 
       'total': None, 
       'linked_tables': []},
        2: {'capacity': 2, 'status': 'available'},
@@ -919,8 +976,9 @@ class RestaurantFunctionTests(unittest.TestCase):
 
   # test iterate_items
   def test_iterate_items(self):
-    # Create table assignment with order for testing
-    rbs.Order.order_count = 1
+    # Create table assignments with orders for testing
+    rbs.Order.order_count = 3
+    # Order with food and drinks
     rbs.tables[1] = {
       'capacity': 2, 
       'status': 'occupied', 
@@ -932,20 +990,58 @@ class RestaurantFunctionTests(unittest.TestCase):
       'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sparkling Water']}, 
       'total': None, 
       'linked_tables': []}
-    # Note the correct total for this order should be 3.5 + 5.0 + 2.0 + 1.75 = 12.25 or $12.25
+    # Note the correct total for order 00001 should be 3.5 + 5.0 + 2.0 + 1.75 = 12.25 or $12.25
+    # Order with food only
+    rbs.tables[2] = {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '17:30 05-23-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00002', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich']}, 
+      'total': None, 
+      'linked_tables': []}    
+    # Note the correct total for order 00002 should be 3.5 + 5.0 = 8.5 or $8.50
+    # Order with drinks only
+    rbs.tables[3] = {
+      'capacity': 4, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '17:30 05-23-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00003', 'drinks': ['Coca Cola', 'Sparkling Water']}, 
+      'total': None, 
+      'linked_tables': []}
+    # Note the correct total for order 00003 should be 2.0 + 1.75 = 3.75 or $3.75
     # Check correct total returned with the 'add' operation
-    self.assertEqual(rbs.iterate_items(1, 'add'), 12.25, 'iterate_items add operation did not return correct total.')
+    # Both food and drinks
+    self.assertEqual(rbs.iterate_items(1, 'add'), 12.25, 'iterate_items add operation did not return correct total for order with food and drinks.')
+    # Foods only
+    self.assertEqual(rbs.iterate_items(2, 'add'), 8.5, 'iterate_items add operation did not return correct total for order with food only.')
+    # Drinks only
+    self.assertEqual(rbs.iterate_items(3, 'add'), 3.75, 'iterate_items add operation did not return correct total for order with drinks only.')
     # Check correct item name and price printing with the 'print' operation
+    # Both food and drinks
     with patch('sys.stdout', new_callable=StringIO) as mock_out:
       rbs.iterate_items(1, 'print')
-    self.assertIn('Tuna Sandwich', mock_out.getvalue(), 'iterate_items print operation did not correctly print first food item name.')
-    self.assertIn('3.50', mock_out.getvalue(), 'iterate_items print operation did not correctly print first food item price.')
-    self.assertIn('Turkey Club Sandwich', mock_out.getvalue(), 'iterate_items print operation did not correctly print second food item name.')
-    self.assertIn('5.00', mock_out.getvalue(), 'iterate_items print operation did not correctly print second food item price.')
-    self.assertIn('Coca Cola', mock_out.getvalue(), 'iterate_items print operation did not correctly print first drink item name.')
-    self.assertIn('2.00', mock_out.getvalue(), 'iterate_items print operation did not correctly print first drink item price.')
-    self.assertIn('Sparkling Water', mock_out.getvalue(), 'iterate_items print operation did not correctly print second drink item name.')
-    self.assertIn('1.75', mock_out.getvalue(), 'iterate_items print operation did not correctly print second drink item price.')
+    self.assertIn(f'{'Tuna Sandwich':<25}{f'{3.50:.2f}':>10}', mock_out.getvalue(), 'iterate_items print operation did not correctly print first food item name and price for order with food and drinks.')
+    self.assertIn(f'{'Turkey Club Sandwich':<25}{f'{5.00:.2f}':>10}', mock_out.getvalue(), 'iterate_items print operation did not correctly print second food item name and price for order with food and drinks.')    
+    self.assertIn(f'{'Coca Cola':<25}{f'{2.00:.2f}':>10}', mock_out.getvalue(), 'iterate_items print operation did not correctly print first drink item name and price for order with food and drinks.')
+    self.assertIn(f'{'Sparkling Water':<25}{f'{1.75:.2f}':>10}', mock_out.getvalue(), 'iterate_items print operation did not correctly print second drink item name and price for order with food and drinks.')
+    # Foods only
+    with patch('sys.stdout', new_callable=StringIO) as mock_out:
+      rbs.iterate_items(2, 'print')
+    self.assertIn(f'{'Tuna Sandwich':<25}{f'{3.50:.2f}':>10}', mock_out.getvalue(), 'iterate_items print operation did not correctly print first food item name and price for food-only order.')
+    self.assertIn(f'{'Turkey Club Sandwich':<25}{f'{5.00:.2f}':>10}', mock_out.getvalue(), 'iterate_items print operation did not correctly print second food item name and price for food-only order.')
+    # Drinks only
+    with patch('sys.stdout', new_callable=StringIO) as mock_out:
+      rbs.iterate_items(3, 'print')
+    self.assertIn(f'{'Coca Cola':<25}{f'{2.00:.2f}':>10}', mock_out.getvalue(), 'iterate_items print operation did not correctly print first drink item name and price for drinks-only order.')
+    self.assertIn(f'{'Sparkling Water':<25}{f'{1.75:.2f}':>10}', mock_out.getvalue(), 'iterate_items print operation did not correctly print second drink item name and price for drinks-only order.')
 
   # test calc_total
   def test_calc_total(self):
@@ -1030,12 +1126,50 @@ class RestaurantFunctionTests(unittest.TestCase):
     }, 'Full tables dict does not match expected values after running calc_total.')
 
   # test print_bill for single payor
-  def test_print_bill_single(self):
-    pass
-
-  # test print_bill with a split
-  def test_print_bill_split(self):
-    pass
+  def test_print_bill(self):    
+    # Create table assignment with order and items
+    rbs.Order.order_count = 1
+    rbs.tables[1] = {
+      'capacity': 2, 
+      'status': 'occupied', 
+      'name': 'Customer', 
+      'vip_status': False, 
+      'has_reservation': False, 
+      'seating_time': '17:30 05-23-2026', 
+      'num_diners': 2, 
+      'order': {'ord_number': '00001', 'food_items': ['Tuna Sandwich', 'Turkey Club Sandwich'], 'drinks': ['Coca Cola', 'Sparkling Water']}, 
+      'total': None, 
+      'linked_tables': []}
+    # Note the correct total for this order should be 3.5 + 5.0 + 2.0 + 1.75 = 12.25 or $12.25
+    # Check validations for split argument
+    with self.assertRaises(TypeError, msg='Non-integer split did not raise TypeError for printing bill.'):
+      rbs.print_bill(1, '2')
+    with self.assertRaises(ValueError, msg='Non-positive integer split did not raise ValueError for printing bill.'):
+      rbs.print_bill(1, 0)
+    # Check printing single bill with split=1    
+    with patch('sys.stdout', new_callable=StringIO) as mock_out:
+      rbs.print_bill(1, split=1)
+    # Confirm order number printed
+    self.assertIn('Order Number: 00001', mock_out.getvalue(), 'Order number did not print correctly on the bill bill.')
+    # Confirm sub-total text and amount printed
+    self.assertIn(f'{'Sub-total:':<25}{'$12.25':>10}', mock_out.getvalue(), 'Sub-total text did not print correctly on unsplit bill.')
+    # Confirm split price line DID NOT print on unsplit bill
+    self.assertNotIn(f'{'Your amount:':<25}{'$12.25':>10}', mock_out.getvalue(), 'Split price line incorrectly printed for split=1.')
+    # Confirm tip text printed with line for customer to write-in amount
+    self.assertIn(f'{'Tip:':<25}__________', mock_out.getvalue(), 'Tip line did not print correctly on unsplit bill.')
+    # Confirm final total text printed with line for customer to write-in amount
+    self.assertIn(f'{'Total:':<25}__________', mock_out.getvalue(), 'Total line did not print correctly on unsplit bill.')
+    # Confirm no split entered defaults to 1 and prints identically
+    with patch('sys.stdout', new_callable=StringIO) as mock_out_default:
+      rbs.print_bill(1)
+    self.assertEqual(mock_out_default.getvalue(), mock_out.getvalue(), 'Unspecified split did not correctly default to 1 and print identical bill.')
+    # Check printing split bill
+    with patch('sys.stdout', new_callable=StringIO) as mock_out_split:
+      rbs.print_bill(1, split=2)
+    # Confirm the split_price line printed correctly
+    self.assertIn(f'{'Your amount:':<25}{'$6.13':>10}', mock_out_split.getvalue(), 'Split price text and amount did not princt correctly.')
+    # Confirm bill printed exactly twice
+    self.assertEqual(mock_out_split.getvalue().count(f'{'Your amount:':<25}{'$6.13':>10}'), 2)
 
   def test_clear_tables(self):
     rbs.Order.order_count = 5
@@ -1194,7 +1328,7 @@ class RestaurantFunctionTests(unittest.TestCase):
       6: {'capacity': 6, 'status': 'available'},
       7: {'capacity': 8, 'status': 'available'}
     }, 'Full table dict does not match expected values after clearing linked tables using linked table number.') 
-          
+
   # tear down test fixture by wiping slate clean again and saving to the JSON to keep the file clear of any table assignments and reservations created and saved to the file by the tests
   def tearDown(self):
     rbs.tables.clear()
