@@ -346,7 +346,7 @@ def calc_total(table_number):
     raise LookupError(f"Table {table_number} has no order attached.")
   # Check that the table's order has items.
   if not any(key in tables[table_number]['order'] for key in ('food_items', 'drinks')):
-    raise LookupError(f"Table {table_number} has no order items to calculate the total.")
+    raise LookupError(f"Table {table_number}\'s order has no items to calculate the total.")
   # Get total using iterate_items with the 'add' op.
   total = iterate_items(table_number, 'add')
   tables[table_number]['total'] = "$" + str(total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
@@ -371,12 +371,12 @@ def print_bill(table_number, split=1):
     print(f"Order Number: {tables[table_number]['order']['ord_number']}\n")
     iterate_items(table_number, 'print')    
     # Print messages for the order total, tip, and total bill.
-    print(f"\n{'Order:':<25}{f'${sub_total}':>10}")
+    print(f"\n{'Sub-total:':<25}{f'${sub_total}':>10}")
     # Check if bill is being split multiple ways
     if split > 1:
       # If yes, print a line with the individual split amount before the tip line
-      print(f"{f'Your amount:':<25}{f'${split_price}':>10}")
-    print(f"{f'Tip:':<25}__________")
+      print(f"{'Your amount:':<25}{f'${split_price}':>10}")
+    print(f"{'Tip:':<25}__________")
     print(f"{'Total:':<25}__________\n")
 
 # Create Reservation class for generating unique reservation IDs using a class variable reservation_count to ensure the counter is not modified elsewhere in the code outside the class constructor.
