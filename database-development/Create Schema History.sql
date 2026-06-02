@@ -1,0 +1,172 @@
+-- Create a new table 'restaurant' to store the restaurant's name, location, and contact info
+CREATE TABLE restaurant (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(30) NOT NULL,
+    street_address VARCHAR (100) NOT NULL,
+    city VARCHAR(50) NOT NULL,
+    state CHAR(2) NOT NULL,
+    zip_code CHAR(5) NOT NULL,
+    phone CHAR(12) NOT NULL,
+    email VARCHAR(254) NOT NULL
+);
+
+-- Create a new table 'roles' with the different roles that staff can have, primary key id will serve as a foreign key role_id in the 'staff' table created next
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(20) UNIQUE NOT NULL
+);
+
+-- Create a new table 'staff' to store the name's and roles of staff members and which restaurant locations they work at
+CREATE TABLE staff (
+    id SERIAL PRIMARY KEY,
+    first_name VARCHAR(20) NOT NULL,
+    last_name VARCHAR(30) NOT NULL,
+    role_id INTEGER REFERENCES roles(id),
+    restaurant_id INTEGER REFERENCES restaurant(id)
+);
+
+-- Create a set of tables for restaurant VIP rewards program
+-- Create a new table 'vip_tiers' with the different benefit levels customers can have within the VIP rewards program
+CREATE TABLE vip_tiers (
+    id SERIAL PRIMARY KEY,
+    tier VARCHAR(20) UNIQUE NOT NULL, -- using varchar type to support either numbered tiers (1, 2, 3, etc.) or descriptive tiers (e.g. bronze, silver, gold, platinum)
+    description TEXT -- a longer description of the tier separate from any alphanumeric identifier like ‘tier 1’ or ‘gold’, example: ‘over 10,000 lifetime rewards points earned’
+);
+
+-- Create a new table 'vip_benefits' to store the different benefits available to VIP rewards members
+CREATE TABLE vip_benefits (
+    id SERIAL PRIMARY KEY,
+    type VARCHAR(20), -- examples: discount, coupon, freebie, reward points
+    description TEXT NOT NULL -- examples: 20% off alcoholic drinks, free entrée for every 1000 points earned
+);
+
+-- Create a new cross-reference table 'tiers_benefits' associating the different benefits to the tiers in which they are eligible
+CREATE TABLE tiers_benefits (
+    tier_id INTEGER REFERENCES vip_tiers(id),
+    benefit_id INTEGER REFERENCES vip_benefits(id),
+    PRIMARY KEY (tier_id, benefit_id)
+);
+
+-- Create a new table 'vip_customers' with a primary key id number for each VIP member and their relevant membership info
+CREATE TABLE vip_customers (
+    id SERIAL PRIMARY KEY,
+    first_name VARCHAR(20) NOT NULL,
+    last_name VARCHAR(30) NOT NULL,
+    phone CHAR(12),
+    email VARCHAR(254),
+    start_date DATE NOT NULL, -- date they joined the VIP/rewards program
+    tier INTEGER NOT NULL REFERENCES vip_tiers(id),
+    tier_start_date DATE NOT NULL, -- date they reached current tier (e.g. date that customer advanced from ‘silver’ to ‘gold’ tier)
+    points INTEGER,
+    text_alerts BOOL NOT NULL DEFAULT FALSE,
+    email_alerts BOOL NOT NULL DEFAULT FALSE    
+);
+
+-- Create a new table 'tables' with a primary key for the table number and then storing relevant info related to the table.
+CREATE TABLE tables (
+    table_num SERIAL PRIMARY KEY,
+    capacity INTEGER NOT NULL,
+    status VARCHAR(10) NOT NULL CHECK (status IN ('available', 'occupied')),
+    cust_name VARCHAR(50) DEFAULT 'Customer',
+    seating_time TIMESTAMP,
+    active_order_id INTEGER,
+    total MONEY,
+    linked_tables INTEGER[]
+);
+
+-- Create new table 'reservation_lookup' to store reservation IDs as the primary key and columns with the pertinent reservation info
+CREATE TABLE reservation_lookup (
+    id VARCHAR(10) PRIMARY KEY,
+    name VARCHAR(20) NOT NULL,
+    reserve_time TIMESTAMP NOT NULL,
+    num_diners INTEGER NOT NULL,
+    vip_id INTEGER REFERENCES vip_customers(id)
+);
+
+-- Create cross-reference table 'tables_reservations' to store the associations between table numbers and the reservations IDs assigned to them, composite primary key combining the table ID and reservation ID
+CREATE TABLE tables_reservations (
+    table_num INTEGER REFERENCES tables(table_num),
+    reservation_id VARCHAR(10) REFERENCES reservation_lookup(id),
+    is_primary BOOL NOT NULL DEFAULT TRUE, -- Indicates if the table number is the primary table for a reservation, defaulting to TRUE for any single-table reservation and the primary table of a multi-table reservation and set to FALSE for linked tables of a multi-table reservation 
+    PRIMARY KEY (table_num, reservation_id)
+);
+
+-- Create a new table 'orders' with a primary key for the order ID number and columns for additional necessary order info
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    table_num INTEGER NOT NULL REFERENCES tables(table_num),
+    customer VARCHAR(50),
+    vip_id INTEGER REFERENCES vip_customers(id),
+    points_earned INTEGER, -- VIP/rewards points earned for the order
+    ord_total MONEY,
+    pay_split INTEGER CHECK (pay_split >= 1), -- Number of people splitting the bill, can be used to validate that the correct number of payments exist for the order
+    status VARCHAR(20) CHECK (status IN ('active', 'open', 'closed', 'canceled', 'refunded'))
+);
+
+-- Create a unique index to restrict each table number in the 'orders' table to only one row with status 'active'
+CREATE UNIQUE INDEX one_active_order_per_table ON orders(table_num) WHERE status = 'active';
+
+-- Add foreign key constraint to the active_order_id column from 'tables' now that the 'orders' table has been created
+ALTER TABLE tables ADD CONSTRAINT fk_active_order FOREIGN KEY (active_order_id) REFERENCES orders(id);
+
+-- Create new table 'order_payments' storing the payment info for each paid and closed out order
+CREATE TABLE order_payments (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id),
+    pre_tip_total MONEY, -- For orders with a single payor, this will be the same as orders.ord_total, but for split bills with multiple payments this will be each payor's split amount
+    tip MONEY,
+    payment_amount MONEY,
+    payment_method VARCHAR(10) CHECK (payment_method IN ('cash', 'credit', 'gift card'))
+);
+
+-- Create new table 'menus' with info for different menus the restaurant offers such as breakfast, lunch, and dinner
+CREATE TABLE menus (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(20) UNIQUE NOT NULL, -- examples: breakfast, lunch, dinner, all-day, specials
+    start_time TIME,
+    end_time TIME
+);
+
+-- Create new table 'items' with all the food and drinks the restaurant serves
+CREATE TABLE items (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(25) NOT NULL,
+    item_type VARCHAR(5) NOT NULL CHECK (item_type IN ('food', 'drink')),
+    category VARCHAR(20), -- examples: appetizer, entrée, side, alcoholic, or non-alcoholic
+    price MONEY NOT NULL,
+    description TEXT -- Item description that can be printed on the menu
+);
+
+-- Create new cross-reference table 'menus_items' to associate the items with the menus on which they are available
+CREATE TABLE menus_items (
+    menu_id INTEGER REFERENCES menus(id),
+    item_id INTEGER REFERENCES items(id),
+    PRIMARY KEY (menu_id, item_id)
+);
+
+-- Create new cross-reference table 'order_items' to store each item placed on each order, the quantity ordered, and the price at the time of the order
+CREATE TABLE order_items (
+    order_id INTEGER REFERENCES orders(id),
+    item_id INTEGER REFERENCES items(id),
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    price_at_order MONEY NOT NULL CHECK (price_at_order >= '0'::MONEY), -- allowing a zero price value to account for freebies/complimentary items that were nonetheless still part of the order
+    PRIMARY KEY (order_id, item_id)
+);
+
+-- Create sequences to store and increment the order_count and reservation_count class variables from the Order and Reservation classes used to create the order number and reservation ID strings in the source code
+CREATE SEQUENCE order_count START 1;
+CREATE SEQUENCE reservation_count START 1 MAXVALUE 99999 CYCLE; -- MAXVALUE and CYCLE are used because the reservation IDs generated based on the reservation count have a fixed format and length with prefix and 5-digit number always 'rsv-#####' to maintain readability. Reservation IDs are removed from the reservation_lookup table when the party arrives and gets seated.
+
+-- Add timestamp columns to 'orders' and 'order_payments' to store the date/time when an order was created and when a payment was processed, which could possibly not be the same-day
+ALTER TABLE orders ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT NOW();
+
+ALTER TABLE order_payments ADD COLUMN processed_at TIMESTAMP NOT NULL DEFAULT NOW();
+
+-- Add column 'num_diners' to table 'tables' for number of guests seated at the table
+ALTER TABLE tables ADD COLUMN num_diners INTEGER;
+
+-- Change the length limitation on the 'name' column in the 'items' table
+ALTER TABLE items ALTER COLUMN name TYPE VARCHAR(50);
+
+-- Add a 'server' column to the 'tables' table
+ALTER TABLE tables ADD COLUMN server_id INTEGER REFERENCES staff(id);

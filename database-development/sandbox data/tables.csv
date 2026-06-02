@@ -1,0 +1,11 @@
+﻿table_num,capacity,status,cust_name,seating_time,active_order_id,total,linked_tables,num_diners,server_id
+1,2,occupied,Jiho Thomas,enter just prior to loading data,1,,,,
+2,2,available,,,,,,,
+3,4,available,,,,,,,
+4,4,occupied,Lisa Wilson,enter just prior to loading data,2,create fake order and calculate,,,
+5,4,available,,,,,,,
+6,6,available,,,,,,,
+7,8,available,,,,,,,
+8,2,occupied,,,,,,,
+9,4,occupied,,,,,,,
+10,6,occupied,Adam West,enter just prior to loading data,3,,"{8, 9}",,

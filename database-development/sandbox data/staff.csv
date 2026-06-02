@@ -1,0 +1,31 @@
+﻿id,first_name,last_name,role_id,restaurant_id
+1,Tina,Fey,manager,1
+2,Frank,Sinatra,head chef,1
+3,Linda,Ronstadt,sous chef,1
+4,Bob,Esterhouse,bartender,1
+5,Laurence,Fishburn,sous chef,1
+6,Reanu,Keeves,server,1
+7,Ken,Campbell,busser,1
+8,Monkey,Cheese,host,1
+9,Rick,Sanchez,valet,1
+10,Mike,Ditka,line cook,1
+11,Liza,Bobiza,server,1
+12,Ashley,Simpson,host,1
+13,Ronald,McDonald,line cook,1
+14,Tina,Belcher,server,1
+15,Sterling,Archer,valet,1
+16,George,Washington,line cook,1
+17,Dick,Butkus,busser,1
+18,Jesus,Guzman,server,1
+19,Peggy,Hill,runner,1
+20,Marie,Curie,runner,1
+21,Joe,Lupo,server,1
+22,Cassandra,Gemini,host,1
+23,Bruce,Wayne,valet,1
+24,Tom,Collins,busser,1
+25,Alfredo,Lopez,cleaner,1
+26,Sarah,Marshall,cleaner,1
+27,Antoine,Fantoine,cleaner,1
+28,Donna,Summers,server,1
+29,John,Smith,line cook,1
+30,Floopy,Doopy,runner,1

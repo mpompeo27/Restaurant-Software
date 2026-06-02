@@ -1,0 +1,8 @@
+﻿id,first_name,last_name,phone,email,start_date,tier,tier_start_date,points,text_alerts,email_alerts
+1,Leroy,Jenkins,,leroy_jenkins@email.com,4/17/2026,1,4/17/2026,323,FALSE,TRUE
+2,Thomas,Bishop,609-555-1342,tommyb17@email.com,9/22/2023,3,3/4/2026,2742,TRUE,TRUE
+3,Ashley,Madison,811-555-7890,madison_ashley1971@email.com,12/11/2024,2,12/29/2025,1349,TRUE,FALSE
+4,Condaleeza,Rice,363-555-2378,cricethegreatest@email.com,3/8/2025,1,3/8/2025,421,FALSE,TRUE
+5,Adam,West,726-123-4567,iambatman1@aol.com,7/26/2019,4,11/16/2023,4975,TRUE,TRUE
+6,Farty,McCheese,,,1/21/2026,1,1/21/2026,114,FALSE,FALSE
+7,Willy,Wonka,,wonka_zonka11@poop.com,5/1/2025,2,10/24/2025,997,FALSE,TRUE

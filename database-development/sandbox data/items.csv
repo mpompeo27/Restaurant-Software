@@ -1,0 +1,85 @@
+﻿id,name,item_type,category,price,description
+1,Eggplant Rollantini,food,Appetizer,12.95,
+2,Spiedini alla Romana,food,Appetizer,12.95,
+3,Zuppa di Clams,food,Appetizer,18.95,(red or white)
+4,Baked Clams or Clams Casino,food,Appetizer,13.95,
+5,Mussels,food,Appetizer,16.95,(red or white)
+6,Fried Calamari,food,Appetizer,17.95,
+7,Spicy Fried Calamari,food,Appetizer,18.95,
+8,Spicy Fried Shrimp,food,Appetizer,18.95,
+9,Shrimp and Red Onions,food,Appetizer,16.95,with garlic and oil
+10,Burrata,food,Appetizer,13.95,"with grape tomatoes, basil, and extra virgin olive oil"
+11,Stuffed Mushrooms,food,Appetizer,11.95,
+12,Broccoli Rabe,food,Appetizer,16.95,sautéed with provolone-filled sausage
+13,Meatballs,food,Appetizer,9.95,"with ricotta, marinara sauce"
+14,Soup of the Day,food,Appetizer,8.95,
+15,Margherita,food,Brick-Oven Pizzas,15.95,
+16,Quattro Formaggio,food,Brick-Oven Pizzas,16.95,(4-cheese)
+17,Spicy Sausage,food,Brick-Oven Pizzas,17.95,
+18,"Spinach, Provolone, and Mozzarella",food,Brick-Oven Pizzas,17.95,
+19,Broccoli Rabe and Sausage,food,Brick-Oven Pizzas,18.95,
+20,Wild Mushroom,food,Brick-Oven Pizzas,17.95,
+21,Broccoli,food,Fresh Vegetables,13.95,
+22,Sauteed Spinach,food,Fresh Vegetables,11.95,
+23,Sauteed Escarole and Beans,food,Fresh Vegetables,13.95,
+24,Fried Zucchini,food,Fresh Vegetables,10.95,
+25,Ravioli,food,Pasta,18.95,
+26,Lobster Ravioli,food,Pasta,25.95,in vodka sauce
+27,Rigatoni Arrabbiata,food,Pasta,28.95,with shrimp
+28,Orecchiette,food,Pasta,25.95,with broccoli rabe and sausage
+29,Cappelletti,food,Pasta,21.95,with broccoli
+30,Cavatelli,food,Pasta,28.95,"with shrimp, escarole, white beans, and tomatoes"
+31,Linguini with Clam Sauce,food,Pasta,25.95,(red or white)
+32,Vermicelli Puttanesca,food,Pasta,22.95,
+33,Fettuccine Alfredo,food,Pasta,22.95,
+34,Pappardelle,food,Pasta,28.95,"with filet mignon tips, shiitake mushrooms, and peas"
+35,Chicken Parmigiana or Francese or Piccata,food,Chicken Breast,24.95,
+36,Chicken Rollantini,food,Chicken Breast,25.95,with fontina cheese and prosciutto
+37,Chicken Sauteed,food,Chicken Breast,24.95,"with peppers, mushrooms, and potatoes"
+38,Pan Fried Chicken,food,Chicken Breast,24.95,with tomatoes and onions over mixed field greens
+39,Veal Cutlet,food,Veal,27.95,marsala or saltimbocca or francese or parmigiana
+40,Veal Scaloppine,food,Veal,27.95,with sweet red peppers and mushrooms
+41,Veal Rollatini,food,Veal,28.95,with fontina cheese and prosciutto
+42,Pork Chop,food,Pork,31.95,sautéed with vinegar peppers and mushrooms
+43,Pork Chop Parmigiana,food,Pork,31.95,
+44,Sirloin Steak,food,From the Broiler,41.95,
+45,Sirloin Steak Au Poivre,food,From the Broiler,41.95,
+46,Filet Mignon,food,From the Broiler,41.95,(grilled)
+47,Filet Mignon Scaloppine Madeira,food,From the Broiler,41.95,with wild mushrooms
+48,Shrimp in White Wine Sauce,food,Shrimp,28.95,
+49,Shrimp Scampi or Fra Diavolo,food,Shrimp,28.95,
+50,Shrimp Francese or Parmigiana or Marinara,food,Shrimp,28.95,
+51,Eggplant Parmigiana,food,Specialties,24.95,
+52,Chicken and Eggplant Parmigiana,food,Specialties,27.95,
+53,Chicken and Sausage Country-Style,food,Specialties,27.95,
+54,Shrimp and Chicken Parmigiana or Francese,food,Specialties,27.95,
+55,Shrimp and Veal Parmigiana or Francese,food,Specialties,27.95,
+56,Coca-Cola,drink,Non-Alcoholic,3.95,
+57,Diet Coke,drink,Non-Alcoholic,3.95,
+58,Sprite,drink,Non-Alcoholic,3.95,
+59,Iced Tea,drink,Non-Alcoholic,3.95,
+60,Lemonade,drink,Non-Alcoholic,4.95,
+61,San Pellegrino,drink,Non-Alcoholic,5.95,sparkling mineral water
+62,Orange Juice,drink,Non-Alcoholic,4.95,
+63,Coffee,drink,Non-Alcoholic,3.95,
+64,Espresso,drink,Non-Alcoholic,3.95,
+65,Cappuccino,drink,Non-Alcoholic,5.95,
+66,Hot Tea,drink,Non-Alcoholic,3.95,
+67,Bud Light,drink,Beer,5.95,
+68,Corona,drink,Beer,6.95,
+69,Heineken,drink,Beer,6.95,
+70,Peroni,drink,Beer,7.95,Italian lager
+71,Moretti,drink,Beer,7.95,Italian lager
+72,House Red Wine,drink,Wine,10.95,
+73,House White Wine,drink,Wine,10.95,
+74,Chianti,drink,Wine,12.95,Tuscan red
+75,Pinot Grigio,drink,Wine,12.95,crisp Italian white
+76,Cabernet Sauvignon,drink,Wine,13.95,
+77,Prosecco,drink,Wine,11.95,Italian sparkling wine
+78,Negroni,drink,Cocktails,13.95,"gin, Campari, sweet vermouth"
+79,Aperol Spritz,drink,Cocktails,13.95,"Aperol, prosecco, soda"
+80,Limoncello Martini,drink,Cocktails,14.95,"vodka, limoncello, lemon juice"
+81,Cosmopolitan,drink,Cocktails,13.95,"vodka, triple sec, cranberry, lime"
+82,Espresso Martini,drink,Cocktails,14.95,"vodka, espresso, coffee liqueur"
+83,Old Fashioned,drink,Cocktails,14.95,"bourbon, bitters, orange"
+84,Whiskey Sour,drink,Cocktails,13.95,"bourbon, lemon juice, simple syrup"

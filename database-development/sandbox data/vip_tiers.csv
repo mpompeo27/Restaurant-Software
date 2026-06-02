@@ -1,0 +1,5 @@
+﻿id,tier,description
+1,bronze,"entry-level rewards tier, less than 20 orders"
+2,silver,20 or more orders
+3,gold,50 or more orders
+4,platinum,over 100 orders

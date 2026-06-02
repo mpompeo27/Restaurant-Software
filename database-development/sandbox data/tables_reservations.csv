@@ -1,0 +1,14 @@
+﻿table_num,reservation_id,is_primary
+3,rsv-09782,TRUE
+6,rsv-09783,TRUE
+7,rsv-09784,TRUE
+2,rsv-09784,FALSE
+5,rsv-09784,FALSE
+1,rsv-09785,TRUE
+4,rsv-09786,TRUE
+6,rsv-09787,TRUE
+3,rsv-09788,TRUE
+5,rsv-09789,TRUE
+2,rsv-09790,TRUE
+10,rsv-09791,TRUE
+9,rsv-09791,FALSE
